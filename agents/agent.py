@@ -1,6 +1,7 @@
 from models.model_registry import ModelRegistry
 from utils.logger import Logger
 
+
 class Agent:
     def __init__(self, model: str):
         self.logger = Logger()

@@ -7,6 +7,7 @@ import logging
 from config.config import load_config
 from .base_model import BaseModel  # Updated import
 
+
 def load_models_dynamically():
     """
     Dynamically load and register all model classes from the models package.
@@ -15,19 +16,20 @@ def load_models_dynamically():
     package_name = __package__  # Should be 'models'
 
     for _, module_name, _ in pkgutil.iter_modules([package_dir]):
-        if module_name.startswith('_') or module_name == 'model_registry':
+        if module_name.startswith("_") or module_name == "model_registry":
             continue  # Skip private modules and model_registry itself
         module = importlib.import_module(f".{module_name}", package=package_name)
         # Iterate through attributes to find subclasses of BaseModel
         for attribute_name in dir(module):
             attribute = getattr(module, attribute_name)
             if (
-                isinstance(attribute, type) 
-                and issubclass(attribute, BaseModel) 
+                isinstance(attribute, type)
+                and issubclass(attribute, BaseModel)
                 and attribute is not BaseModel
             ):
                 instance = attribute()
                 ModelRegistry.register_model(instance)
+
 
 class ModelRegistry:
     _models = {}
@@ -50,6 +52,7 @@ class ModelRegistry:
         except Exception as e:
             cls.logger.error(f"Error loading models: {e}")
             raise
+
 
 # Initialize and load models
 ModelRegistry.load_models()

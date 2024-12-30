@@ -8,11 +8,13 @@ sys.path.insert(0, parent_dir)
 
 from agents import Agent
 
+
 def main():
     model = "gpt-4o-mini"
 
     agent = Agent(model=model)
     agent.execute("Who are you?")
+
 
 if __name__ == "__main__":
     main()

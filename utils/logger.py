@@ -1,5 +1,6 @@
 import logging
 
+
 class Logger:
     def __init__(self):
         self.logger = logging.getLogger("agent-core")
@@ -7,7 +8,7 @@ class Logger:
             # Prevent adding multiple handlers in interactive environments
             handler = logging.StreamHandler()
             formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
             )
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
