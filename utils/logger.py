@@ -12,10 +12,21 @@ class Logger:
             )
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
-            self.logger.setLevel(logging.INFO)
+            self.logger.setLevel(
+                logging.DEBUG
+            )  # Set to DEBUG to capture debug messages
+
+    def debug(self, message: str):
+        self.logger.debug(message)
 
     def info(self, message: str):
         self.logger.info(message)
 
+    def warning(self, message: str):
+        self.logger.warning(message)
+
     def error(self, message: str):
         self.logger.error(message)
+
+    def critical(self, message: str):
+        self.logger.critical(message)
