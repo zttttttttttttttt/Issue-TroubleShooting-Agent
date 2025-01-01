@@ -1,6 +1,11 @@
 import os
 
 
+class Config:
+    DEFAULT_MODEL = "gpt-4o-mini"  # Default model name
+    # You can add more configuration constants here as needed
+
+
 def load_config():
     """
     Load configuration settings into environment variables.

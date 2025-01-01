@@ -2,14 +2,26 @@ from models.model_registry import ModelRegistry
 from utils.logger import Logger
 from typing import Optional, List
 from planners import GenericPlanner, Step
+from config import Config
 
 
 class Agent:
-    def __init__(self):
+    def __init__(self, model: Optional[str] = None):
+        """
+        If 'model' is not provided, the default model from config will be used.
+        """
         self.logger = Logger()
         self._model = None
         self._planner = None
-        self.logger.info("Agent instance created. Model and Planner not set yet.")
+
+        # If no model is passed, use the default from config
+        if not model:
+            model = Config.DEFAULT_MODEL
+
+        # Use the property setter to initialize the model
+        self.model = model
+
+        self.logger.info("Agent instance created.")
 
     @property
     def model(self) -> Optional[str]:

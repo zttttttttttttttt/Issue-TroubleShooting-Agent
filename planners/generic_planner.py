@@ -3,12 +3,19 @@ from models.model_registry import ModelRegistry
 from utils.logger import Logger
 from typing import List
 from .step import Step
+from config import Config
 
 
 class GenericPlanner:
-    def __init__(self):
+    def __init__(self, model: str = None):
+        """
+        If 'model' is not provided, the default model from config will be used.
+        """
         self.logger = Logger()
-        self.model_name = "gpt-4o-mini"  # Default model for planning
+        if not model:
+            model = Config.DEFAULT_MODEL
+
+        self.model_name = model
         self.model = ModelRegistry.get_model(self.model_name)
         if not self.model:
             self.logger.error(f"Model '{self.model_name}' not found for planning.")
