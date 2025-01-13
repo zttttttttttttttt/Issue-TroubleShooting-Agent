@@ -1,3 +1,5 @@
+# examples/example3.py
+
 import sys
 import os
 
