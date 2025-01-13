@@ -1,247 +1,220 @@
-# agent-core - LLM Agent Framework
+# [agent-core] LLM Agent Framework
 
-agent-core is a modular and extensible framework designed to facilitate the development of Language Model (LLM) agents. It provides a structured approach to defining agents, integrating various language models, and executing tasks seamlessly. Whether you’re building simple command-based agents or complex conversational agents, this framework offers the flexibility and scalability you need.
+A comprehensive, example-driven framework for orchestrating tasks using Large Language Models (LLMs). This project demonstrates how to build agents that plan and execute tasks in both a **step-by-step** manner (via a `GenericPlanner`) or via a **graph-based** approach (via a `GraphPlanner`). The framework provides:
+
+- **Agent** classes that can be configured with different planners and models.
+- **Planner** classes to break down tasks step-by-step or build a node-based plan graph.
+- **Model** classes that dynamically load and interact with various LLM backends.
+- **Validator** classes that evaluate the correctness of each step or node output.
+
+This repository includes multiple **examples** showcasing different use-cases.
+
+---
 
 ## Table of Contents
 
-- Features
-- Project Structure
-- Installation
-- Configuration
-  - Direct Environment Variable Setting
-- Usage
-  - Running the Example
-  - Example Script Breakdown
-- Adding New Models
-  - Step-by-Step Guide
-  - Best Practices
-- Logging
-  - Logger Configuration
-  - Logging Usage
-- Dependencies
-  - Core Dependencies
-  - Additional Dependencies
-  - Installation of Dependencies
-- Contributing
-  - Steps to Contribute
-- License
+1. [Project Introduction](#project-introduction)
+2. [Features](#features)
+3. [File Structure](#file-structure)
+4. [Installation](#installation)
+5. [Dynamic Model Creation](#dynamic-model-creation)
+6. [Usage](#usage)
+7. [Contributing](#contributing)
+8. [License](#license)
+
+---
+
+## Project Introduction
+
+This LLM Agent Framework aims to streamline task execution and planning workflows through:
+
+- **Agent** objects that receive high-level tasks.
+- **Planners** that decompose these tasks into multiple steps (or nodes) automatically using a Large Language Model.
+- **Execution** of each step or node, capturing intermediate outputs and verifying correctness via an LLM-based score validator.
+- **Adaptive** re-planning when steps fail to meet a validation threshold.
+
+From straightforward tasks (“Who are you?”) to multi-step workflows (“draw a flower in multiple steps”), the framework abstracts away the complexities of LLM usage, while providing extensibility to integrate additional models or custom logic.
+
+---
 
 ## Features
 
-- Modular Design: Separate components for agents, models, configuration, and utilities.
-- Dynamic Model Loading: Automatically discover and register new models without modifying core code.
-- Configuration Management: Centralized configuration handling using environment variables.
-- Extensible: Easily add support for additional language models.
-- Logging: Integrated logging for monitoring framework operations.
+1. **Multiple Models**: Easily switch between different OpenAI-based or custom LLMs by registering them in `ModelRegistry`.
+2. **Two Planner Strategies**:
+   - **GenericPlanner**: Generates a simple list of steps (JSON-based) and executes them one by one.
+   - **GraphPlanner**: Builds a directed graph of nodes, executes them in sequence, and can re-plan on failure.
+3. **Step-by-step Validation**: Each step (or node) is evaluated by a `ScoreValidator` that uses LLM-based scoring logic.
+4. **Dynamic Model Loading**: Place a new model in `models/` and it is automatically picked up and registered.
+5. **Example-Driven**: Multiple examples (`examples/`) demonstrate usage from simple to more complex scenarios.
 
-## Project Structure
+---
 
- agent-core/ ├── agents/ │   ├── __init__.py │   └── agent.py ├── config/ │   ├── __init__.py │   └── config.py ├── models/ │   ├── __init__.py │   ├── base_model.py │   ├── model_registry.py │   ├── gpt_4o_mini.py │   └── gpt_35_turbo.py ├── utils/ │   ├── __init__.py │   └── logger.py ├── examples/ │   ├── __init__.py │   └── example1.py ├── requirements.txt └── README.md 
+## File Structure
 
-### Component Overview
+.
+├── agents/
+│ └── agent.py # Main Agent class
+├── planners/
+│ ├── generic_planner.py # Step-based plan generation & execution
+│ └── graph_planner.py # Graph-based planning and execution logic
+├── models/
+│ ├── base_model.py # Abstract BaseModel class
+│ ├── gpt_4o_mini.py # Example GPT-4o-mini model
+│ ├── gpt_35_turbo.py # Example GPT-3.5-turbo model
+│ └── model_registry.py # Dynamic model registry & loader
+├── validators/
+│ └── score_validator.py # Score-based LLM validator
+├── utils/
+│ ├── context_manager.py # Maintains context during node-based execution
+│ └── logger.py # Custom logger
+├── config/
+│ ├── config.py # Holds default config, e.g., default model
+│ └── init.py
+├── examples/
+│ ├── example1.py # Simple usage (Agent with direct execution)
+│ ├── example2.py # Agent + GenericPlanner usage
+│ ├── example3.py # Multiple agents & planners
+│ ├── example4.py # Accessing agent execution history
+│ └── example5.py # GraphPlanner demonstration
+└── README.md # Project readme (this file)
 
-- agents/: Contains the Agent class responsible for interacting with language models.
-- config/: Handles configuration settings, including environment variable loading.
-- models/: Houses different language model implementations and the dynamic model registry.
-- utils/: Provides utility functions, including logging.
-- examples/: Contains example scripts demonstrating how to use the framework.
-- requirements.txt: Lists all Python dependencies required for the project.
+---
 
 ## Installation
 
-1. Clone the Repository
+#### 1. Clone the repository
 
-bash git clone https://github.com/lukewu8023/agent-core.git cd agent-core 
+```bash
+git clone https://github.com/<your-username>/agent-core.git
+cd llm-agent-framework
+```
 
-2. Create a Virtual Environment
+#### 2. (Optional) Create a virtual environment
 
-It’s recommended to use a virtual environment to manage dependencies.
+```bash
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+```
 
-bash python -m venv .venv 
+#### 3. Install the project as a library
 
-3. Activate the Virtual Environment
+If there is a setup.py file in the root directory, you can do:
 
-- Windows:
+```bash
+pip install -e .
+```
 
-bash venv\Scripts\activate 
+If no setup.py is present, you can install by referencing the directory:
 
-- Unix/Linux/MacOS:
+```bash
+pip install -e path/to/agent-core
+```
 
-bash source venv/bin/activate 
+This will make the agents, planners, models, etc. available in your Python environment.
 
-4. Install Dependencies
+## Dynamic Model Creation
 
-bash pip install -r requirements.txt 
+To add or modify models that the framework can use:
 
-## Configuration
+#### 1. Create a new file in models/, e.g., my_new_model.py.
 
-The framework uses environment variables to manage configurations such as API keys and model settings. You can set these variables directly in your environment or use a .env file for convenience.
-
-### Direct Environment Variable Setting
-
-Alternatively, you can set environment variables directly in your operating system. Ensure that the following variables are set before running any scripts:
-
-- OPENAI_API_BASE
-- OPENAI_API_KEY
-
-## Usage
-
-### Running the Example
-
-An example script is provided to demonstrate how to use the framework. This script initializes an agent with a specified model and executes a command.
-
-1. Navigate to the Project Root
-
-Ensure you’re in the root directory of the project.
-
-bash cd agent-core
-
-2. Run the Example Script
-
-bash python examples/example1.py 
-
-## Adding New Models
-
-The framework is designed to support multiple language models. Adding a new model involves creating a new model class that inherits from BaseModel and placing it in the models/ directory.
-
-### Step-by-Step Guide
-
-1. Create a New Model File
-
-For example, to add a model named NewModel, create a file new_model.py in the models/ directory.
-
-bash touch models/new_model.py 
-
-2. Define the Model Class
+#### 2. Extend the BaseModel class. For example:
 
 ```python
-# models/new_model.py
-
 from .base_model import BaseModel
-from some_language_model_library import NewModelLibrary  # Replace with actual library
 
-class NewModel(BaseModel):
-    def init(self):
-        super().init(name=“new-model”)
-        self.model_instance = NewModelLibrary(
-            model=“new-model”,
-            parameter1=value1,
-            parameter2=value2,
-            # Add necessary initialization parameters
-        )
+class MyNewModel(BaseModel):
+    def __init__(self):
+        super().__init__(name="my-new-model")
+        # Initialize your model connection / client here
 
-    def process(self, command: str) -> str:
-        response = self.model_instance.execute(command)
+    def process(self, request: str) -> str:
+        # Call your model's API or logic, then return the string result
+        response = ...
         return response
 ```
 
-Notes:
+#### 3. Register automatically: The model_registry.py uses dynamic loading to discover new subclasses of BaseModel. Once your file is in models/, it will be registered at runtime.
 
-- Replace some_language_model_library and NewModelLibrary with the actual library and class names you’re using.
-- Initialize the model instance with necessary parameters.
+#### 4. Use your new model:
 
-3. Automatic Registration
+```python
+from agents import Agent
 
-Once the new model file is in the models/ directory and follows the naming convention, the ModelRegistry will automatically discover and register it without any further modifications.
+agent = Agent(model="my-new-model")
+response = agent.execute("Hello, new model!")
+```
 
-4. Use the New Model
+No additional configuration needed—just ensure your model’s class is named properly and placed in the models/ directory.
 
-Update your example script or application to use the new model.
+## Usage
 
-python model = "new-model" agent = Agent(model=model) agent.execute("Your command here.") 
+We provide multiple examples in the examples/ folder to illustrate various ways of using the framework:
 
-### Best Practices
+#### 1. Example 1: example1.py
 
-- Consistent Naming: Use clear and consistent naming conventions for model classes and files.
-- Configuration Management: If the new model requires additional configuration parameters, update the .env file accordingly.
-- Error Handling: Implement robust error handling within the process method to manage potential issues during command execution.
+Demonstrates a basic Agent using direct execution (no planner).
 
-## Logging
+```bash
+python examples/example1.py
+```
 
-The framework includes an integrated logging utility to monitor operations and debug issues effectively.
+#### 2. Example 2: example2.py
 
-### Logging Usage
+Shows how to attach a GenericPlanner to the agent to generate steps.
 
-Logs are automatically generated during agent initialization and command execution. You can customize the logging level and handlers as needed by modifying the Logger class.
+```bash
+python examples/example2.py
+```
 
-## Dependencies
+#### 3. Example 3: example3.py
 
-The project relies on several Python packages to function correctly. Ensure all dependencies are installed using the provided requirements.txt.
+Illustrates using multiple agents (with different models) and planners.
 
-### Core Dependencies
+#### 4. Example 4: example4.py
 
-- langchain-core==0.3.28: Core components for building language model applications.
-- langchain-openai==0.2.14: OpenAI integration for LangChain.
-- openai==1.58.1: OpenAI API client.
-- pydantic==2.10.4: Data validation and settings management using Python type annotations.
+Demonstrates retrieving the agent’s execution_history and final execution_result.
 
-### Additional Dependencies
+#### 5. Example 5: example5.py
 
-- anyio==4.7.0
-- certifi==2024.12.14
-- charset-normalizer==3.4.1
-- distro==1.9.0
-- h11==0.14.0
-- httpcore==1.0.7
-- httpx==0.28.1
-- idna==3.10
-- jiter==0.8.2
-- jsonpatch==1.33
-- jsonpointer==3.0.0
-- langsmith==0.2.6
-- orjson==3.10.13
-- packaging==24.2
-- PyYAML==6.0.2
-- regex==2024.11.6
-- requests==2.32.3
-- requests-toolbelt==1.0.0
-- sniffio==1.3.1
-- tenacity==9.0.0
-- tiktoken==0.8.0
-- tqdm==4.67.1
-- typing_extensions==4.12.2
-- urllib3==2.3.0
+Uses the GraphPlanner for node-based planning, demonstrating validation & re-planning.
 
-### Installation of Dependencies
+#### General Workflow:
 
-All dependencies can be installed using pip:
+1. Instantiate an Agent with a chosen model (or use the default).
+2. Optionally set a planner:
 
-bash pip install -r requirements.txt 
+- GenericPlanner (step-based).
+- GraphPlanner (node-based).
+
+3. Call agent.execute("Your task").
+4. For step-based planners, each step is automatically executed and recorded.
+5. For graph-based planners, the plan (nodes) is built and executed with possible re-planning on failure.
+6. Access agent.execution_history or call agent.get_execution_result() for a final summary.
 
 ## Contributing
 
-Contributions are welcome! Whether you’re fixing bugs, improving documentation, or adding new features, your input helps make this framework better.
+We welcome contributions! Please follow these steps:
 
-### Steps to Contribute
+1. Fork the repository on GitHub.
+2. Create a new branch for your feature or bug fix.
+3. Commit your changes with clear messages.
+4. Push your branch to your fork.
+5. Submit a Pull Request (PR) to the main repository.
 
-1. Fork the Repository
+Guidelines
 
-Click the “Fork” button at the top-right corner of the repository page to create a personal copy.
+- Write clear commit messages.
+- Ensure your changes are tested (new or existing examples).
+- Maintain coding style (pep8 or black).
 
-2. Clone Your Fork
+Feel free to open an issue for any feature request, question, or bug report.
 
-bash git clone https://github.com/yourusername/agent-core.git cd agent-core 
+## License
 
-3. Create a New Branch
+This project is distributed under the terms specified in the LICENSE file (if provided). If not provided, please consult the repository owner for the exact license details.
 
-bash git checkout -b feature/YourFeatureName 
+---
 
-4. Make Changes
-
-Implement your feature or fix.
-
-5. Commit Your Changes
-
-bash git add . git commit -m "Description of your changes" 
-
-6. Push to Your Fork
-
-bash git push origin feature/YourFeatureName 
-
-7. Create a Pull Request
-
-Navigate to the original repository and click “New Pull Request.” Provide a clear description of your changes.
-
-—
-
-Disclaimer: This framework is provided as-is without any warranties. Use it at your own risk.
+Thank you for your interest in the LLM Agent Framework. We hope it accelerates your AI-driven workflows and inspires new ways to leverage LLMs in your own projects!
