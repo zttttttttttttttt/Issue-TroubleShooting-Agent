@@ -1,3 +1,5 @@
+# models/model_registry.py
+
 from abc import ABC, abstractmethod
 import pkgutil
 import importlib
