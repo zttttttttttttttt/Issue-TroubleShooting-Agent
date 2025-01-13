@@ -15,4 +15,10 @@ class GPT35TURBOModel(BaseModel):
             HumanMessage(request),
         ]
         response = self.model_instance.invoke(messages)
-        return response
+
+        # Extract the 'content' attribute to return a string
+        if hasattr(response, "content"):
+            return response.content
+        else:
+            # Fallback in case 'content' is missing
+            return str(response)
