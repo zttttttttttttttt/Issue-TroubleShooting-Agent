@@ -16,7 +16,7 @@ def main():
     agent.model = "gpt-4o-mini"
     agent.planner = GenericPlanner()
 
-    task = "Build a react web applicaiton, click button will popup hello world on the screen."
+    task = "3 steps draw a flower."
     agent.execute(task)
 
 
