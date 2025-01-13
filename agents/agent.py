@@ -1,7 +1,9 @@
+from typing import Optional, List
+
+from planners.generic_planner import GenericPlanner
+from planners.graph_planner import GraphPlanner
 from models.model_registry import ModelRegistry
 from utils.logger import Logger
-from typing import Optional, List
-from planners import GenericPlanner, Step
 from config import Config
 
 
@@ -33,7 +35,7 @@ class Agent:
         self.logger.info("Agent instance created.")
 
     @property
-    def model(self) -> Optional[str]:
+    def model(self):
         return self._model
 
     @model.setter
@@ -66,10 +68,39 @@ class Agent:
         return self._execution_history
 
     def execute(self, task: str):
-        self.logger.info(f"Executing task: {task}")
-        if self._planner:
-            # Use planner to create a plan
-            steps: List[Step] = self._planner.plan(task)
+        """
+        1) If no planner, do direct execution with the model.
+        2) If planner is GenericPlanner, run step-by-step and record each step in execution_history.
+        3) If planner is GraphPlanner, call .plan(task), which automatically runs node-based planning.
+           The GraphPlanner internally executes the plan graph, so we only return a status message here.
+        """
+        self.logger.info(f"Agent is executing task: {task}")
+
+        # Case 1: No planner => direct single-step
+        if not self._planner:
+            response = self._model.process(task)
+            self.logger.info(f"Response: {response}")
+            self._execution_history.append(
+                {
+                    "step_name": "Direct Task Execution",
+                    "step_description": task,
+                    "step_result": str(response),
+                }
+            )
+            return response
+
+        # Case 2: Using a planner
+        steps = self._planner.plan(task)
+
+        # If the planner is GraphPlanner, .plan() already calls execute_plan() internally.
+        # So we do NOT do the step-based for-loop here.
+        if isinstance(self._planner, GraphPlanner):
+            # Return after the graph-based plan is done
+            return "Task execution completed using GraphPlanner."
+
+        # Otherwise, it's a GenericPlanner => do step-based execution
+        if isinstance(self._planner, GenericPlanner):
+            # (Note: If it's a GraphPlanner subclassing GenericPlanner, you'd hit the above if-check first.)
             self.logger.info(f"Executing plan with {len(steps)} steps.")
             for idx, step in enumerate(steps, 1):
                 self.logger.info(f"Executing Step {idx}: {step.description}")
@@ -84,31 +115,18 @@ class Agent:
                         "step_result": str(response),
                     }
                 )
-
-            return "Task execution completed using planner."
-        else:
-            # Directly execute the task
-            response = self._model.process(task)
-            self.logger.info(f"Response: {response}")
-
-            self._execution_history.append(
-                {
-                    "step_name": "Direct Task Execution",
-                    "step_description": task,
-                    "step_result": str(response),
-                }
-            )
-
-            return response
+            return "Task execution completed using GenericPlanner."
 
     def get_execution_result(self) -> str:
         """
         Produce an overall summary describing how the solution was completed,
-        using the LLM to format the final explanation.
-
-        Returns:
-            A string representing the summary or conclusion of the entire execution.
+        using the LLM (agent's model) to format the final explanation if desired.
         """
+        if not self._execution_history:
+            return (
+                "No direct step-based execution history recorded. "
+                "(If you used GraphPlanner, the node-based execution is stored inside the planner.)"
+            )
 
         # Build a textual representation of the execution history
         history_lines = []
@@ -136,10 +154,6 @@ Summary:
 """
 
         self.logger.info("Generating final execution result (summary).")
-        summary_response = self._model.process(request=prompt)
+        summary_response = self._model.process(prompt)
 
-        # If the model returns an AIMessage, extract text if needed
-        if hasattr(summary_response, "content"):
-            return summary_response.content
-        else:
-            return str(summary_response)
+        return str(summary_response)

@@ -1,4 +1,4 @@
 from .generic_planner import GenericPlanner
-from .step import Step
+from .graph_planner import GraphPlanner
 
-__all__ = ["GenericPlanner", "Step"]
+__all__ = ["GenericPlanner", "GraphPlanner"]

@@ -1,12 +1,29 @@
 import json
+from typing import List
+
 from models.model_registry import ModelRegistry
 from utils.logger import Logger
-from typing import List
-from .step import Step
 from config import Config
 
 
+class Step:
+    """
+    Represents a step with a name and a description.
+    """
+
+    def __init__(self, name: str, description: str):
+        self.name = name
+        self.description = description
+
+    def __repr__(self):
+        return f"Step(name='{self.name}', description='{self.description}')"
+
+
 class GenericPlanner:
+    """
+    A simple planner that calls the model to break a task into JSON steps.
+    """
+
     def __init__(self, model: str = None):
         """
         If 'model' is not provided, the default model from config will be used.
@@ -51,25 +68,44 @@ Example:
 
 Task: {task}
 
+
+Output ONLY valid JSON. No extra text or markdown.
 Steps:
 """
-        try:
-            response = self.model.process(request=prompt)
-            # Extract the textual content from the AIMessage object
-            if hasattr(response, "content"):
-                response_text = response.content
-            elif hasattr(response, "text"):
-                response_text = response.text
-            else:
-                # Fallback if neither attribute exists
-                response_text = str(response)
 
-            steps = self.parse_steps(response_text)
-            self.logger.info(f"Plan created with {len(steps)} steps.")
-            return steps
-        except Exception as e:
-            self.logger.error(f"Error during planning: {e}")
-            raise
+        response = self.model.process(prompt)
+        response_text = str(response)
+
+        if not response_text or not response_text.strip():
+            self.logger.error("LLM returned an empty or null response.")
+            raise ValueError("LLM returned an empty or null response.")
+
+        self.logger.debug(f"Raw LLM response: {repr(response_text)}")
+
+        # Minor cleanup of possible code fences
+        cleaned = response_text.replace("```json", "").replace("```", "").strip()
+
+        # Attempt JSON parse
+        try:
+            data = json.loads(cleaned)
+            steps_data = data.get("steps", [])
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse JSON: {e}")
+            self.logger.error(f"Raw LLM response was: {cleaned}")
+            raise ValueError("Invalid JSON format in planner response.")
+
+        # Convert steps_data to Step objects
+        results = []
+        for sd in steps_data:
+            name = sd.get("step_name")
+            desc = sd.get("step_description")
+            if name and desc:
+                results.append(Step(name=name, description=desc))
+            else:
+                self.logger.warning(f"Incomplete step data: {sd}")
+
+        self.logger.info(f"Got {len(results)} steps from the LLM.")
+        return results
 
     def parse_steps(self, response: str) -> List[Step]:
         """
