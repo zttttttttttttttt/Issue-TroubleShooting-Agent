@@ -5,6 +5,8 @@ from datetime import datetime
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 
+from langchain_core.tools import BaseTool
+
 from utils.logger import Logger
 from config import Config
 from validators import ScoreValidator
@@ -25,10 +27,14 @@ class Node:
     """
     Represents a single node in the PlanGraph.
     """
-
+    logger = Logger()
     id: str
     task_description: str
     next_nodes: List[str] = field(default_factory=list)
+
+    task_use_tool: bool = False
+    task_tool_name: str = ''
+    task_tool: BaseTool = None
 
     execution_results: List[ExecutionResult] = field(default_factory=list)
     validation_threshold: float = 0.8
@@ -44,18 +50,63 @@ class Node:
         print(f"Executing Node {self.id}: {self.task_description}")
         self.current_attempts += 1
 
-        # Add node info to context
-        key = f"Node-{self.id}"
-        context_manager.add_context(key, self.task_description)
-
+        tool_description = ''
+        if self.task_use_tool:
+            tool_description = str(self.task_tool.args_schema.model_json_schema())
         # Build the prompt from the entire context plus instructions
         prompt = (
             f"{context_manager.context_to_str()}\n"
             f"Now, process the above context and handle the following task:\n"
-            f"{self.task_description}"
-        )
+            f"Task Desc: {self.task_description}\n"
+            f"Task Use Tool: {self.task_use_tool}\n"
+            f"Task Tool Description: {tool_description}\n"
 
+            f"If Task Use Tool is `False`, process according the `Task Description`\n"
+            f"If Task Use Tool is `True`, process according the `Task Tool`, "
+            f"For each tool arguments, based on context and human's question to generate arguments value "
+            f"according to the arguments description.\n"
+            f"""
+            The result must not contain any explanatory note, like '// explain', make sure it is pure json string can be format as json object.
+
+            Example:
+            the example used tool:
+            {{
+                "use_tool": true,
+                "tool_name": "Event",
+                "tool_arguments": {{
+                    "eventId": "1000"
+                }}
+            }}
+            the example used context:
+            {{
+                "use_tool": false,
+                "response": "result detail"
+            }}
+            """
+        )
         response = model.process(prompt)
+        cleaned = response.replace("```json", "").replace("```", "").strip()
+        # Attempt JSON Parse
+        try:
+            data = json.loads(cleaned)
+            if data['use_tool']:
+                response = (f"task tool description: {self.task_tool.description}\n"
+                            f"task tool response : {self.task_tool.invoke(data['tool_arguments'])}")
+            else:
+                response = data['response']
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse JSON: {e}")
+            self.logger.error(f"Raw LLM response was: {cleaned}")
+            raise ValueError("Invalid JSON format in planner response.")
+
+        # Add node info to context
+        key = f"Node-{self.id}"
+
+        context_manager.add_context(key, f"""
+        task description: {self.task_description}
+        task response: {response}
+        """)
+        print(response)
         return response
 
     def validate(self, result: str, model) -> float:
@@ -118,7 +169,6 @@ class PlanGraph:
         Executes each node in sequence. If a node fails validation, attempt replan.
         """
         self.current_node_id = self.current_node_id or self.start_node_id
-
         while self.current_node_id:
             if self.current_node_id not in self.nodes:
                 print(
@@ -134,6 +184,7 @@ class PlanGraph:
             if score >= node.validation_threshold:
                 # Move on
                 if node.next_nodes:
+                    # Record the step execution
                     self.current_node_id = node.next_nodes[0]
                 else:
                     print("Plan execution completed successfully.")
@@ -175,7 +226,7 @@ class PlanGraph:
         }
 
     def call_llm_for_replan(
-        self, model, failure_info: Dict, context_manager: ContextManager
+            self, model, failure_info: Dict, context_manager: ContextManager
     ) -> str:
         """
         Build a replan prompt from the plan summary + context + failure info,
@@ -184,26 +235,26 @@ class PlanGraph:
         plan_summary = self.summarize_plan()
         context_str = context_manager.context_to_str()
         prompt = f"""
-{context_str}
+        {context_str}
 
-Below is the current plan and its execution state:
+        Below is the current plan and its execution state:
 
-**Plan Summary:**
-{plan_summary}
+        **Plan Summary:**
+        {plan_summary}
 
-**Execution History:**
-{failure_info['execution_history']}
+        **Execution History:**
+        {failure_info['execution_history']}
 
-**Failure Reason:**
-{failure_info['failure_reason']}
+        **Failure Reason:**
+        {failure_info['failure_reason']}
 
-**Replanning History:**
-{failure_info['replan_history']}
+        **Replanning History:**
+        {failure_info['replan_history']}
 
-Instructions:
-- Decide if we do a "breakdown" or "replan".
-- Return valid JSON with keys: "action", "new_subtasks", "restart_node_id", "modifications", "rationale".
-"""
+        Instructions:
+        - Decide if we do a "breakdown" or "replan".
+        - Return valid JSON with keys: "action", "new_subtasks", "restart_node_id", "modifications", "rationale".
+        """
         print("Calling model for replan instructions...")
         response = model.process(prompt)
         print("Replan response:", response)
@@ -270,18 +321,21 @@ class GraphPlanner(GenericPlanner):
             ContextManager()
         )  # Keep a context manager for the entire plan
 
-    def plan(self, task: str) -> List[Step]:
+    def plan(self, task: str, tools: Optional[List[BaseTool]]) -> List[Step]:
         """
         1) Use the base class to get Steps.
         2) Convert them into a PlanGraph.
         3) Execute plan_graph using self.model and self.context_manager.
         4) Return Steps (for reference).
         """
-        steps = super().plan(task)
+        steps = super().plan(task, tools)
 
         plan_graph = PlanGraph()
         previous_node = None
 
+        tool_map = dict()
+        if tools is not None:
+            tool_map = {tool.name: tool for tool in tools}
         for idx, step in enumerate(steps, start=1):
             node_id = chr(65 + idx - 1)  # A, B, C, ...
             next_node_id = chr(65 + idx) if idx < len(steps) else ""
@@ -289,10 +343,14 @@ class GraphPlanner(GenericPlanner):
             node = Node(
                 id=node_id,
                 task_description=step.description,
+                task_use_tool=step.use_tool,
                 next_nodes=[next_node_id] if next_node_id else [],
                 validation_threshold=0.8,
                 max_attempts=3,
             )
+            if node.task_use_tool and step.tool_name in tool_map:
+                node.task_tool_name = step.tool_name
+                node.task_tool = tool_map.get(node.task_tool_name)
             plan_graph.add_node(node)
 
             if previous_node:
@@ -338,7 +396,7 @@ def parse_llm_response(llm_response: str) -> Optional[str]:
 
 
 def apply_adjustments_to_plan(
-    plan_graph, node_id: str, adjustments_str: str, nodes_dict: Dict[str, Node]
+        plan_graph, node_id: str, adjustments_str: str, nodes_dict: Dict[str, Node]
 ):
     adjustments = json.loads(adjustments_str)
     action = adjustments.get("action")
