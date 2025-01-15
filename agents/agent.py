@@ -1,77 +1,161 @@
-# examples/example1.py
+# agents/agent.py
 
-import sys
-import os
+from typing import Optional, List
 
-# Add the parent directory to sys.path to allow imports from the framework
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
-
-from agents import Agent
-from planners import GraphPlanner
-from langchain_core.tools import tool
-from typing import Annotated, List
+from planners.generic_planner import GenericPlanner
+from planners.graph_planner import GraphPlanner
+from models.model_registry import ModelRegistry
+from utils.logger import Logger
+from config import Config
 
 
-@tool('event')
-def get_event(
-        event_id: Annotated[int, 'event id']
-) -> dict:
-    """Get Event Detail"""
-    return {"event": {"id": 10000, "version": 1, "date": {"start_time": "1700000000", "end_time": "1710000000"}}}
+class Agent:
+    def __init__(self, model: Optional[str] = None):
+        """
+        If 'model' is not provided, the default model from config will be used.
+        """
+        self.logger = Logger()
+        self._model = None
+        self._planner = None
 
+        # This list holds execution data for each step in sequence.
+        # Example entry:
+        # {
+        #   "step_name": "Draw the stem",
+        #   "step_description": "Draw a vertical line as the flower's stem",
+        #   "step_result": "Stem drawn successfully."
+        # }
+        self._execution_history = []
 
-@tool('metric')
-def get_metric(
-        component_name: Annotated[str, 'component name'],
-        start_time: Annotated[int, 'start time'],
-        end_time: Annotated[int, 'end time']
-) -> List:
-    """Get metric data from prometheus by component name"""
-    return [
-        {"name": "CPU Usage", "data": [[123456789, 10], [123456789, 12]]},
-        {"name": "Memory Usage", "data": [[123456789, 10], [123456789, 12]]},
-    ]
+        # If no model is passed, use the default from config
+        if not model:
+            model = Config.DEFAULT_MODEL
 
+        # Use the property setter to initialize the model
+        self.model = model
 
-@tool('log')
-def get_log(
-        component_name: Annotated[str, 'component name'],
-        event_id: Annotated[int, 'event id'],
-        start_time: Annotated[int, 'start time'],
-        end_time: Annotated[int, 'end time']
-) -> dict:
-    """Get log from kibana by component name and event id"""
-    return {"trace_id": "123456-123456-123456", "log": "sql execute failed"}
+        self.logger.info("Agent instance created.")
 
+    @property
+    def model(self):
+        return self._model
 
-@tool('trace')
-def get_trace(
-        trace_id: Annotated[str, 'trace id']
-) -> List:
-    """Get trace data from jaeger by trace id"""
-    return [{
-        "eventId": 10000,
-        "traceId": "123456-123456-123456",
-        "process": "sql execute failed, no table exist: select * from schema.table"
-    }]
+    @model.setter
+    def model(self, model_name: str):
+        model = ModelRegistry.get_model(model_name)
+        if not model:
+            self.logger.error(f"Model '{model_name}' not found in registry.")
+            raise ValueError(f"Model '{model_name}' is not supported.")
+        self._model = model
+        self.logger.info(f"Agent model set to: {model.name}")
 
+    @property
+    def planner(self) -> Optional[GenericPlanner]:
+        return self._planner
 
-def main():
-    agent = Agent(model="gpt-3.5-turbo")
+    @planner.setter
+    def planner(self, planner: GenericPlanner):
+        if not isinstance(planner, GenericPlanner):
+            self.logger.error("Planner must be an instance of GenericPlanner.")
+            raise TypeError("Planner must be an instance of GenericPlanner.")
+        self._planner = planner
+        self.logger.info(f"Agent planner set to: {planner.__class__.__name__}")
 
-    agent.tools = [get_event, get_metric, get_log, get_trace]
-    agent.planner = GraphPlanner()
+    @property
+    def execution_history(self) -> List[dict]:
+        """
+        Read-only access to the execution history.
+        Each item is a dict with keys: 'step_name', 'step_description', 'step_result'.
+        """
+        return self._execution_history
 
-    task = "What's going on for event id 10000 in IE component?"
-    agent.execute(task)
+    def execute(self, task: str):
+        """
+        1) If no planner, do direct execution with the model.
+        2) If planner is GenericPlanner, run step-by-step and record each step in execution_history.
+        3) If planner is GraphPlanner, call .plan(task), which automatically runs node-based planning.
+           The GraphPlanner internally executes the plan graph, so we only return a status message here.
+        """
+        self.logger.info(f"Agent is executing task: {task}")
 
-    execution_history = agent.execution_history
-    print(execution_history)
-    execution_result = agent.get_execution_result()
-    print(execution_result)
+        # Case 1: No planner => direct single-step
+        if not self._planner:
+            response = self._model.process(task)
+            self.logger.info(f"Response: {response}")
+            self._execution_history.append(
+                {
+                    "step_name": "Direct Task Execution",
+                    "step_description": task,
+                    "step_result": str(response),
+                }
+            )
+            return response
 
+        # Case 2: Using a planner
+        steps = self._planner.plan(task)
 
-if __name__ == "__main__":
-    main()
+        # If the planner is GraphPlanner, .plan() already calls execute_plan() internally.
+        # So we do NOT do the step-based for-loop here.
+        if isinstance(self._planner, GraphPlanner):
+            # Return after the graph-based plan is done
+            return "Task execution completed using GraphPlanner."
+
+        # Otherwise, it's a GenericPlanner => do step-based execution
+        if isinstance(self._planner, GenericPlanner):
+            # (Note: If it's a GraphPlanner subclassing GenericPlanner, you'd hit the above if-check first.)
+            self.logger.info(f"Executing plan with {len(steps)} steps.")
+            for idx, step in enumerate(steps, 1):
+                self.logger.info(f"Executing Step {idx}: {step.description}")
+                response = self._model.process(step.description)
+                self.logger.info(f"Response for Step {idx}: {response}")
+
+                # Record the step execution
+                self._execution_history.append(
+                    {
+                        "step_name": step.name,
+                        "step_description": step.description,
+                        "step_result": str(response),
+                    }
+                )
+            return "Task execution completed using GenericPlanner."
+
+    def get_execution_result(self) -> str:
+        """
+        Produce an overall summary describing how the solution was completed,
+        using the LLM (agent's model) to format the final explanation if desired.
+        """
+        if not self._execution_history:
+            return (
+                "No direct step-based execution history recorded. "
+                "(If you used GraphPlanner, the node-based execution is stored inside the planner.)"
+            )
+
+        # Build a textual representation of the execution history
+        history_lines = []
+        for idx, record in enumerate(self._execution_history, 1):
+            line = (
+                f"Step {idx}: {record['step_name']}\n"
+                f"Description: {record['step_description']}\n"
+                f"Result: {record['step_result']}\n"
+            )
+            history_lines.append(line)
+
+        history_text = "\n".join(history_lines)
+
+        # Construct a prompt for summarizing the entire execution
+        prompt = f"""
+You are an assistant summarizing the outcome of a multi-step plan execution.
+Below is the complete step-by-step execution history. Provide a concise,
+well-structured summary describing how the solution was achieved and any
+notable details. Include each step's role in the final outcome.
+
+Execution History:
+{history_text}
+
+Summary:
+"""
+
+        self.logger.info("Generating final execution result (summary).")
+        summary_response = self._model.process(prompt)
+
+        return str(summary_response)
