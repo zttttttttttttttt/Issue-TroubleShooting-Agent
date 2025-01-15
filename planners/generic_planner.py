@@ -22,8 +22,10 @@ class Step:
         self.tool_name = tool_name
 
     def __repr__(self):
-        return (f"Step(name='{self.name}', description='{self.description}', "
-                f"use_tool='{self.use_tool}', tool_name='{self.tool_name}')")
+        return (
+            f"Step(name='{self.name}', description='{self.description}', "
+            f"use_tool='{self.use_tool}', tool_name='{self.tool_name}')"
+        )
 
 
 class GenericPlanner:
@@ -60,9 +62,12 @@ class GenericPlanner:
             List[Step]: A list of Step objects to execute the task.
         """
         self.logger.info(f"Creating plan for task: {task}")
-        tools_knowledge = ''
+        tools_knowledge = ""
         if tools is not None:
-            tools_knowledge = [f"tool name: {tool.name}, tool description: {tool.description}" for tool in tools]
+            tools_knowledge = [
+                f"tool name: {tool.name}, tool description: {tool.description}"
+                for tool in tools
+            ]
         prompt = f"""
         Given the following task and tool, generate a detailed plan by breaking it down into actionable steps. Present each step in JSON format with the attributes 'step_name' and 'step_description'. All steps should be encapsulated under the 'steps' key.
 
@@ -127,8 +132,14 @@ class GenericPlanner:
             use_tool = sd.get("use_tool")
             tool_name = sd.get("tool_name")
             if name and desc and use_tool:
-                results.append(Step(name=name, description=desc,
-                                    use_tool=use_tool, tool_name=tool_name))
+                results.append(
+                    Step(
+                        name=name,
+                        description=desc,
+                        use_tool=use_tool,
+                        tool_name=tool_name,
+                    )
+                )
             else:
                 self.logger.warning(f"Incomplete step data: {sd}")
 

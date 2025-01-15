@@ -27,13 +27,14 @@ class Node:
     """
     Represents a single node in the PlanGraph.
     """
+
     logger = Logger()
     id: str
     task_description: str
     next_nodes: List[str] = field(default_factory=list)
 
     task_use_tool: bool = False
-    task_tool_name: str = ''
+    task_tool_name: str = ""
     task_tool: BaseTool = None
 
     execution_results: List[ExecutionResult] = field(default_factory=list)
@@ -50,7 +51,7 @@ class Node:
         print(f"Executing Node {self.id}: {self.task_description}")
         self.current_attempts += 1
 
-        tool_description = ''
+        tool_description = ""
         if self.task_use_tool:
             tool_description = str(self.task_tool.args_schema.model_json_schema())
         # Build the prompt from the entire context plus instructions
@@ -60,7 +61,6 @@ class Node:
             f"Task Desc: {self.task_description}\n"
             f"Task Use Tool: {self.task_use_tool}\n"
             f"Task Tool Description: {tool_description}\n"
-
             f"If Task Use Tool is `False`, process according the `Task Description`\n"
             f"If Task Use Tool is `True`, process according the `Task Tool`, "
             f"For each tool arguments, based on context and human's question to generate arguments value "
@@ -89,11 +89,13 @@ class Node:
         # Attempt JSON Parse
         try:
             data = json.loads(cleaned)
-            if data['use_tool']:
-                response = (f"task tool description: {self.task_tool.description}\n"
-                            f"task tool response : {self.task_tool.invoke(data['tool_arguments'])}")
+            if data["use_tool"]:
+                response = (
+                    f"task tool description: {self.task_tool.description}\n"
+                    f"task tool response : {self.task_tool.invoke(data['tool_arguments'])}"
+                )
             else:
-                response = data['response']
+                response = data["response"]
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse JSON: {e}")
             self.logger.error(f"Raw LLM response was: {cleaned}")
@@ -102,10 +104,13 @@ class Node:
         # Add node info to context
         key = f"Node-{self.id}"
 
-        context_manager.add_context(key, f"""
+        context_manager.add_context(
+            key,
+            f"""
         task description: {self.task_description}
         task response: {response}
-        """)
+        """,
+        )
         print(response)
         return response
 
@@ -226,7 +231,7 @@ class PlanGraph:
         }
 
     def call_llm_for_replan(
-            self, model, failure_info: Dict, context_manager: ContextManager
+        self, model, failure_info: Dict, context_manager: ContextManager
     ) -> str:
         """
         Build a replan prompt from the plan summary + context + failure info,
@@ -396,7 +401,7 @@ def parse_llm_response(llm_response: str) -> Optional[str]:
 
 
 def apply_adjustments_to_plan(
-        plan_graph, node_id: str, adjustments_str: str, nodes_dict: Dict[str, Node]
+    plan_graph, node_id: str, adjustments_str: str, nodes_dict: Dict[str, Node]
 ):
     adjustments = json.loads(adjustments_str)
     action = adjustments.get("action")

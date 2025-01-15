@@ -1,4 +1,4 @@
-# examples/example1.py
+# examples/example6.py
 
 import sys
 import os
@@ -14,19 +14,23 @@ from langchain_core.tools import tool
 from typing import Annotated, List
 
 
-@tool('event')
-def get_event(
-        event_id: Annotated[int, 'event id']
-) -> dict:
+@tool("event")
+def get_event(event_id: Annotated[int, "event id"]) -> dict:
     """Get Event Detail"""
-    return {"event": {"id": 10000, "version": 1, "date": {"start_time": "1700000000", "end_time": "1710000000"}}}
+    return {
+        "event": {
+            "id": 10000,
+            "version": 1,
+            "date": {"start_time": "1700000000", "end_time": "1710000000"},
+        }
+    }
 
 
-@tool('metric')
+@tool("metric")
 def get_metric(
-        component_name: Annotated[str, 'component name'],
-        start_time: Annotated[int, 'start time'],
-        end_time: Annotated[int, 'end time']
+    component_name: Annotated[str, "component name"],
+    start_time: Annotated[int, "start time"],
+    end_time: Annotated[int, "end time"],
 ) -> List:
     """Get metric data from prometheus by component name"""
     return [
@@ -35,27 +39,27 @@ def get_metric(
     ]
 
 
-@tool('log')
+@tool("log")
 def get_log(
-        component_name: Annotated[str, 'component name'],
-        event_id: Annotated[int, 'event id'],
-        start_time: Annotated[int, 'start time'],
-        end_time: Annotated[int, 'end time']
+    component_name: Annotated[str, "component name"],
+    event_id: Annotated[int, "event id"],
+    start_time: Annotated[int, "start time"],
+    end_time: Annotated[int, "end time"],
 ) -> dict:
     """Get log from kibana by component name and event id"""
     return {"trace_id": "123456-123456-123456", "log": "sql execute failed"}
 
 
-@tool('trace')
-def get_trace(
-        trace_id: Annotated[str, 'trace id']
-) -> List:
+@tool("trace")
+def get_trace(trace_id: Annotated[str, "trace id"]) -> List:
     """Get trace data from jaeger by trace id"""
-    return [{
-        "eventId": 10000,
-        "traceId": "123456-123456-123456",
-        "process": "sql execute failed, no table exist: select * from schema.table"
-    }]
+    return [
+        {
+            "eventId": 10000,
+            "traceId": "123456-123456-123456",
+            "process": "sql execute failed, no table exist: select * from schema.table",
+        }
+    ]
 
 
 def main():
