@@ -17,7 +17,7 @@ class Agent:
         self.logger = Logger()
         self._model = None
         self._planner = None
-
+        self.tools = None
         # This list holds execution data for each step in sequence.
         # Example entry:
         # {
@@ -92,7 +92,7 @@ class Agent:
             return response
 
         # Case 2: Using a planner
-        steps = self._planner.plan(task)
+        steps = self._planner.plan(task, self.tools)
 
         # If the planner is GraphPlanner, .plan() already calls execute_plan() internally.
         # So we do NOT do the step-based for-loop here.

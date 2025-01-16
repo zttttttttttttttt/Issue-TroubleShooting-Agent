@@ -47,7 +47,7 @@ def get_log(
     end_time: Annotated[int, "end time"],
 ) -> dict:
     """Get log from kibana by component name and event id"""
-    return {"trace_id": "123456-123456-123456", "log": "sql execute failed"}
+    return {"trace_id": "123456-123456-123456", "component": "IE", "event_id": "10000", "log": "sql execute failed"}
 
 
 @tool("trace")
