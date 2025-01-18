@@ -50,16 +50,12 @@ class GenericPlanner:
             )
         self.logger.info(f"GenericPlanner initialized with model: {self.model.name}")
 
-    def plan(self, task: str, tools: Optional[List[BaseTool]]) -> List[Step]:
+    def plan(
+        self, task: str, tools: Optional[List[BaseTool]], knowledge: str = ""
+    ) -> List[Step]:
         """
         Use the LLM to break down the task into multiple steps in JSON format.
-
-        Args:
-            task (str): The task to be broken down.
-            tools (str): The tool can be used.
-
-        Returns:
-            List[Step]: A list of Step objects to execute the task.
+        'knowledge' is appended to the prompt to guide the planning process.
         """
         self.logger.info(f"Creating plan for task: {task}")
         tools_knowledge = ""
@@ -69,7 +65,11 @@ class GenericPlanner:
                 for tool in tools
             ]
         prompt = f"""
-        Given the following task and tool, generate a detailed plan by breaking it down into actionable steps. Present each step in JSON format with the attributes 'step_name' and 'step_description'. All steps should be encapsulated under the 'steps' key.
+        We have the following knowledge that might help: {knowledge}
+
+        Given the following task and the possible tools, generate a detailed plan by breaking it down into actionable steps. 
+        Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name'.
+        All steps should be encapsulated under the 'steps' key.
 
         Example:
         {{
@@ -97,7 +97,7 @@ class GenericPlanner:
 
         Task: {task}
 
-        Tool: {tools_knowledge}
+        Tools: {tools_knowledge}
 
         Output ONLY valid JSON. No extra text or markdown.
         Steps:

@@ -10,7 +10,7 @@ from langchain_core.tools import BaseTool
 from utils.logger import Logger
 from config import Config
 from validators import ScoreValidator
-from utils.context_manager import ContextManager  # <-- We keep the context manager
+from utils.context_manager import ContextManager
 from .generic_planner import GenericPlanner, Step
 from models.model_registry import ModelRegistry
 
@@ -43,9 +43,11 @@ class Node:
     current_attempts: int = 0
     failed_reasons: List[str] = field(default_factory=list)
 
-    def execute(self, model, context_manager: ContextManager) -> str:
+    def execute(
+        self, model, context_manager: ContextManager, background: str = ""
+    ) -> str:
         """
-        Update the context with this node's info, build a prompt from context,
+        Update the context with this node's info, build a prompt from context + background,
         and call model.process(...).
         """
         print(f"Executing Node {self.id}: {self.task_description}")
@@ -57,6 +59,7 @@ class Node:
         # Build the prompt from the entire context plus instructions
         prompt = (
             f"{context_manager.context_to_str()}\n"
+            f"Background: {background}\n"
             f"Now, process the above context and handle the following task:\n"
             f"Task Desc: {self.task_description}\n"
             f"Task Use Tool: {self.task_use_tool}\n"
@@ -169,7 +172,9 @@ class PlanGraph:
         if self.start_node_id is None:
             self.start_node_id = node.id
 
-    def execute_plan(self, model, context_manager: ContextManager):
+    def execute_plan(
+        self, model, context_manager: ContextManager, background: str = ""
+    ):
         """
         Executes each node in sequence. If a node fails validation, attempt replan.
         """
@@ -182,14 +187,13 @@ class PlanGraph:
                 break
 
             node = self.nodes[self.current_node_id]
-            result = node.execute(model, context_manager)
+            result = node.execute(model, context_manager, background=background)
             score = node.validate(result, model)
             print(f"Node {node.id} execution score: {score}")
 
             if score >= node.validation_threshold:
                 # Move on
                 if node.next_nodes:
-                    # Record the step execution
                     self.current_node_id = node.next_nodes[0]
                 else:
                     print("Plan execution completed successfully.")
@@ -233,10 +237,6 @@ class PlanGraph:
     def call_llm_for_replan(
         self, model, failure_info: Dict, context_manager: ContextManager
     ) -> str:
-        """
-        Build a replan prompt from the plan summary + context + failure info,
-        then call model.process(...).
-        """
         plan_summary = self.summarize_plan()
         context_str = context_manager.context_to_str()
         prompt = f"""
@@ -322,18 +322,25 @@ class GraphPlanner(GenericPlanner):
         super().__init__(model)
         self.logger = Logger()
         self.plan_graph: Optional[PlanGraph] = None
-        self.context_manager = (
-            ContextManager()
-        )  # Keep a context manager for the entire plan
+        self.context_manager = ContextManager()
+        self._background = ""  # We'll store background for node execution
 
-    def plan(self, task: str, tools: Optional[List[BaseTool]]) -> List[Step]:
+    def plan(
+        self,
+        task: str,
+        tools: Optional[List[BaseTool]],
+        knowledge: str = "",
+        background: str = "",
+    ) -> List[Step]:
         """
-        1) Use the base class to get Steps.
+        1) Use the base class to get Steps, guided by `knowledge`.
         2) Convert them into a PlanGraph.
-        3) Execute plan_graph using self.model and self.context_manager.
-        4) Return Steps (for reference).
+        3) Store `background` for later usage when executing nodes.
+        4) Execute plan_graph using self.model and self.context_manager.
+        5) Return Steps (for reference).
         """
-        steps = super().plan(task, tools)
+        steps = super().plan(task, tools, knowledge=knowledge)
+        self._background = background  # Save background for node execution
 
         plan_graph = PlanGraph()
         previous_node = None
@@ -341,6 +348,7 @@ class GraphPlanner(GenericPlanner):
         tool_map = dict()
         if tools is not None:
             tool_map = {tool.name: tool for tool in tools}
+
         for idx, step in enumerate(steps, start=1):
             node_id = chr(65 + idx - 1)  # A, B, C, ...
             next_node_id = chr(65 + idx) if idx < len(steps) else ""
@@ -356,6 +364,7 @@ class GraphPlanner(GenericPlanner):
             if node.task_use_tool and step.tool_name in tool_map:
                 node.task_tool_name = step.tool_name
                 node.task_tool = tool_map.get(node.task_tool_name)
+
             plan_graph.add_node(node)
 
             if previous_node:
@@ -365,9 +374,11 @@ class GraphPlanner(GenericPlanner):
         self.plan_graph = plan_graph
         self.logger.info("PlanGraph built. Executing now...")
 
-        # Here we pass the agent's model and the shared context manager
+        # Execute the plan with background
         self.plan_graph.execute_plan(
-            model=self.model, context_manager=self.context_manager
+            model=self.model,
+            context_manager=self.context_manager,
+            background=self._background,
         )
         return steps
 

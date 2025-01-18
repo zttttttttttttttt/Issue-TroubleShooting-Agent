@@ -27,6 +27,10 @@ class Agent:
         # }
         self._execution_history = []
 
+        # --- New fields ---
+        self.knowledge = ""  # Used to guide how we make plans
+        self.background = ""  # Used during execution steps
+
         # If no model is passed, use the default from config
         if not model:
             model = Config.DEFAULT_MODEL
@@ -71,16 +75,18 @@ class Agent:
 
     def execute(self, task: str):
         """
-        1) If no planner, do direct execution with the model.
-        2) If planner is GenericPlanner, run step-by-step and record each step in execution_history.
-        3) If planner is GraphPlanner, call .plan(task), which automatically runs node-based planning.
-           The GraphPlanner internally executes the plan graph, so we only return a status message here.
+        1) If no planner, do direct execution with the model (use background).
+        2) If planner is GenericPlanner, run step-by-step (use background) and record each step.
+        3) If planner is GraphPlanner, call .plan(task), which automatically runs node-based planning
+           (using knowledge for plan generation and background for node execution).
         """
         self.logger.info(f"Agent is executing task: {task}")
 
         # Case 1: No planner => direct single-step
         if not self._planner:
-            response = self._model.process(task)
+            # Incorporate background in the direct prompt
+            prompt = f"Background: {self.background}\nTask: {task}"
+            response = self._model.process(prompt)
             self.logger.info(f"Response: {response}")
             self._execution_history.append(
                 {
@@ -91,8 +97,8 @@ class Agent:
             )
             return response
 
-        # Case 2: Using a planner
-        steps = self._planner.plan(task, self.tools)
+        # Case 2: Using a planner => pass knowledge to the plan
+        steps = self._planner.plan(task, self.tools, knowledge=self.knowledge)
 
         # If the planner is GraphPlanner, .plan() already calls execute_plan() internally.
         # So we do NOT do the step-based for-loop here.
@@ -105,8 +111,10 @@ class Agent:
             # (Note: If it's a GraphPlanner subclassing GenericPlanner, you'd hit the above if-check first.)
             self.logger.info(f"Executing plan with {len(steps)} steps.")
             for idx, step in enumerate(steps, 1):
+                # Incorporate background for each step’s prompt
+                step_prompt = f"Background: {self.background}\n{step.description}"
                 self.logger.info(f"Executing Step {idx}: {step.description}")
-                response = self._model.process(step.description)
+                response = self._model.process(step_prompt)
                 self.logger.info(f"Response for Step {idx}: {response}")
 
                 # Record the step execution
