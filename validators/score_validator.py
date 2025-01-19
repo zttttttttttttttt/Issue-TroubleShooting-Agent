@@ -5,57 +5,72 @@ from utils.logger import get_logger
 
 
 class ScoreValidator:
-    def __init__(self, model, log_level=None):
+    DEFAULT_PROMPT = """\
+You are an expert validator of AI-generated outputs. Evaluate the provided subtask output based on the following criteria:
+
+1. **Accuracy** (Score 1-5): The output fulfills the requirements of the subtask accurately.
+2. **Completeness** (Score 1-5): The output addresses all aspects of the subtask.
+3. **Relevance** (Score 1-5): The content is directly relevant to the subtask without extraneous information.
+4. **Coherence and Clarity** (Score 1-5): The output is logically structured, clear, and easy to understand.
+5. **Consistency** (Score 1-5): The output is consistent with previous subtasks and doesn't contradict itself.
+6. **Following Instructions** (Score 1-5): The output adheres to any specific instructions or formats specified.
+7. **Error Analysis** (Score 1-5): The output is free from factual, grammatical, and logical errors.
+8. **Ethical Compliance** (Score 1-5): The content complies with ethical guidelines and policies.
+
+For each criterion, provide:
+
+- **Score (1-5)**
+- **Justification:** A brief explanation for your score.
+
+At the end:
+
+- Calculate the **Total Score**.
+- Provide a final recommendation:
+
+- **Accept Output** if the total score is above 35 and no criterion scored below 3.
+- **Rerun Subtask** if the total score is 35 or below, or if any criterion scored below 3.
+
+- If recommending a rerun, provide suggestions on how to improve the output.
+
+---
+
+**Subtask Description:**
+{request}
+
+**Subtask Output:**
+{response}
+
+**Evaluation:**
+"""
+
+    def __init__(self, model, log_level=None, prompt: str = None):
         """
         Pass in the agent's model instance so we can call model.process(...) for validation prompts.
         Optionally specify log_level for debug or other logs.
+        'prompt' can override the default prompt template.
         """
         self.logger = get_logger("score-validator", log_level)
         self.model = model
+        self._prompt = prompt or self.DEFAULT_PROMPT
 
-    def create_validator_prompt(self, request, response):
-        prompt = f"""
-        You are an expert validator of AI-generated outputs. Evaluate the provided subtask output based on the following criteria:
+    @property
+    def prompt(self) -> str:
+        """Get or set the entire validation prompt template."""
+        return self._prompt
 
-        1. **Accuracy** (Score 1-5): The output fulfills the requirements of the subtask accurately.
-        2. **Completeness** (Score 1-5): The output addresses all aspects of the subtask.
-        3. **Relevance** (Score 1-5): The content is directly relevant to the subtask without extraneous information.
-        4. **Coherence and Clarity** (Score 1-5): The output is logically structured, clear, and easy to understand.
-        5. **Consistency** (Score 1-5): The output is consistent with previous subtasks and doesn't contradict itself.
-        6. **Following Instructions** (Score 1-5): The output adheres to any specific instructions or formats specified.
-        7. **Error Analysis** (Score 1-5): The output is free from factual, grammatical, and logical errors.
-        8. **Ethical Compliance** (Score 1-5): The content complies with ethical guidelines and policies.
+    @prompt.setter
+    def prompt(self, value: str):
+        self._prompt = value
 
-        For each criterion, provide:
-
-        - **Score (1-5)**
-        - **Justification:** A brief explanation for your score.
-
-        At the end:
-
-        - Calculate the **Total Score**.
-        - Provide a final recommendation:
-
-        - **Accept Output** if the total score is above 35 and no criterion scored below 3.
-        - **Rerun Subtask** if the total score is 35 or below, or if any criterion scored below 3.
-
-        - If recommending a rerun, provide suggestions on how to improve the output.
-
-        ---
-
-        **Subtask Description:**
-        {request}
-
-        **Subtask Output:**
-        {response}
-
-        **Evaluation:**
+    def create_validator_prompt(self, request, response) -> str:
         """
-        return prompt
+        Render the current prompt template using the provided request and response.
+        """
+        return self._prompt.format(request=request, response=response)
 
     def parse_validation_response(self, validation_response):
         """
-        Simple check to see if the model's textual response
+        Simple check if the model's textual response
         contains 'Accept Output' or 'Rerun Subtask'.
         """
         accept_keywords = ["Accept Output", "accept output"]
@@ -112,8 +127,8 @@ class ScoreValidator:
         2) Call self.model.process(prompt).
         3) Return the raw textual response.
         """
-        prompt = self.create_validator_prompt(request, response)
-        validation_response = self.model.process(prompt)  # replaced LLMChat usage
+        prompt_text = self.create_validator_prompt(request, response)
+        validation_response = self.model.process(prompt_text)
         return validation_response
 
 

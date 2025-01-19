@@ -28,6 +28,38 @@ class Node:
     """
 
     logger = get_logger("graph-planner.node")  # minimal usage for node-level logs
+
+    # Expose Node's default prompt for execution
+    DEFAULT_PROMPT = """\
+{context}
+Background: {background}
+Now, process the above context and handle the following task:
+Task Desc: {task_description}
+Task Use Tool: {task_use_tool}
+Task Tool Description: {tool_description}
+If Task Use Tool is `False`, process according to the `Task Description`
+If Task Use Tool is `True`, process according to the `Task Tool`,
+For each tool argument, based on context and human's question to generate arguments value
+according to the argument description.
+
+The result must not contain any explanatory note (like '// explain'). Provide a pure JSON string that can be parsed.
+
+Example:
+the example used tool:
+{
+    "use_tool": true,
+    "tool_name": "Event",
+    "tool_arguments": {
+        "eventId": "1000"
+    }
+}
+the example used context:
+{
+    "use_tool": false,
+    "response": "result detail"
+}
+"""
+
     id: str
     task_description: str
     next_nodes: List[str] = field(default_factory=list)
@@ -42,6 +74,17 @@ class Node:
     current_attempts: int = 0
     failed_reasons: List[str] = field(default_factory=list)
 
+    # Store the node's prompt in an instance variable, defaulting to DEFAULT_PROMPT
+    _prompt: str = field(default=DEFAULT_PROMPT, init=False)
+
+    @property
+    def prompt(self) -> str:
+        return self._prompt
+
+    @prompt.setter
+    def prompt(self, value: str):
+        self._prompt = value
+
     def execute(
         self, model, context_manager: ContextManager, background: str = ""
     ) -> str:
@@ -55,38 +98,17 @@ class Node:
         tool_description = ""
         if self.task_use_tool:
             tool_description = str(self.task_tool.args_schema.model_json_schema())
-        # Build the prompt from the entire context plus instructions
-        prompt = (
-            f"{context_manager.context_to_str()}\n"
-            f"Background: {background}\n"
-            f"Now, process the above context and handle the following task:\n"
-            f"Task Desc: {self.task_description}\n"
-            f"Task Use Tool: {self.task_use_tool}\n"
-            f"Task Tool Description: {tool_description}\n"
-            f"If Task Use Tool is `False`, process according the `Task Description`\n"
-            f"If Task Use Tool is `True`, process according the `Task Tool`, "
-            f"For each tool arguments, based on context and human's question to generate arguments value "
-            f"according to the arguments description.\n"
-            f"""
-            The result must not contain any explanatory note, like '// explain', make sure it is pure json string can be format as json object.
 
-            Example:
-            the example used tool:
-            {{
-                "use_tool": true,
-                "tool_name": "Event",
-                "tool_arguments": {{
-                    "eventId": "1000"
-                }}
-            }}
-            the example used context:
-            {{
-                "use_tool": false,
-                "response": "result detail"
-            }}
-            """
+        # Render final node prompt
+        final_prompt = self._prompt.format(
+            context=context_manager.context_to_str(),
+            background=background,
+            task_description=self.task_description,
+            task_use_tool=self.task_use_tool,
+            tool_description=tool_description,
         )
-        response = model.process(prompt)
+
+        response = model.process(final_prompt)
         cleaned = response.replace("```json", "").replace("```", "").strip()
         # Attempt JSON Parse
         try:
@@ -161,10 +183,47 @@ class PlanGraph:
     Executes them in order, and triggers replan logic if needed.
     """
 
+    logger = get_logger("graph-planner")
+
+    # The PlanGraph has one main replan prompt
+    DEFAULT_PROMPT = """\
+{context_str}
+
+Below is the current plan and its execution state:
+
+**Plan Summary:**
+{plan_summary}
+
+**Execution History:**
+{execution_history}
+
+**Failure Reason:**
+{failure_reason}
+
+**Replanning History:**
+{replan_history}
+
+Instructions:
+- Decide if we do a "breakdown" or "replan".
+- Return valid JSON with keys: "action", "new_subtasks", "restart_node_id", "modifications", "rationale".
+"""
+
     nodes: Dict[str, Node] = field(default_factory=dict)
     start_node_id: Optional[str] = None
     replan_history: ReplanHistory = field(default_factory=ReplanHistory)
     current_node_id: Optional[str] = None
+
+    # We'll store the replan prompt in an instance variable
+    _prompt: str = field(default=DEFAULT_PROMPT, init=False)
+
+    @property
+    def prompt(self) -> str:
+        """Prompt for replan instructions in call_llm_for_replan."""
+        return self._prompt
+
+    @prompt.setter
+    def prompt(self, value: str):
+        self._prompt = value
 
     def add_node(self, node: Node):
         self.nodes[node.id] = node
@@ -238,29 +297,17 @@ class PlanGraph:
     ) -> str:
         plan_summary = self.summarize_plan()
         context_str = context_manager.context_to_str()
-        prompt = f"""
-        {context_str}
 
-        Below is the current plan and its execution state:
+        final_prompt = self._prompt.format(
+            context_str=context_str,
+            plan_summary=plan_summary,
+            execution_history=failure_info["execution_history"],
+            failure_reason=failure_info["failure_reason"],
+            replan_history=failure_info["replan_history"],
+        )
 
-        **Plan Summary:**
-        {plan_summary}
-
-        **Execution History:**
-        {failure_info['execution_history']}
-
-        **Failure Reason:**
-        {failure_info['failure_reason']}
-
-        **Replanning History:**
-        {failure_info['replan_history']}
-
-        Instructions:
-        - Decide if we do a "breakdown" or "replan".
-        - Return valid JSON with keys: "action", "new_subtasks", "restart_node_id", "modifications", "rationale".
-        """
         print("Calling model for replan instructions...")
-        response = model.process(prompt)
+        response = model.process(final_prompt)
         print("Replan response:", response)
         return response
 
@@ -317,12 +364,27 @@ class GraphPlanner(GenericPlanner):
     executes node-based logic with re-planning.
     """
 
-    def __init__(self, model: str = None, log_level: Optional[str] = None):
-        super().__init__(model=model, log_level=log_level)
+    def __init__(
+        self,
+        model: str = None,
+        log_level: Optional[str] = None,
+        prompt: str = None,
+        node_prompt: str = None,
+        replan_prompt: str = None,
+    ):
+        """
+        :param prompt:       Override for the base planning prompt inherited from GenericPlanner.
+        :param node_prompt:  Override for Node execution prompt.
+        :param replan_prompt:Override for PlanGraph's replan prompt.
+        """
+        super().__init__(model=model, log_level=log_level, prompt=prompt)
         self.logger = get_logger("graph-planner", log_level)
         self.plan_graph: Optional[PlanGraph] = None
         self.context_manager = ContextManager()
         self._background = ""  # We'll store background for node execution
+
+        self._node_prompt = node_prompt
+        self._replan_prompt = replan_prompt
 
     def plan(
         self,
@@ -342,6 +404,10 @@ class GraphPlanner(GenericPlanner):
         self._background = background  # Save background for node execution
 
         plan_graph = PlanGraph()
+        # If user gave a custom replan prompt, override PlanGraph's prompt
+        if self._replan_prompt:
+            plan_graph.prompt = self._replan_prompt
+
         previous_node = None
 
         tool_map = dict()
@@ -360,6 +426,10 @@ class GraphPlanner(GenericPlanner):
                 validation_threshold=0.8,
                 max_attempts=3,
             )
+            # If user gave a custom node prompt, override
+            if self._node_prompt:
+                node.prompt = self._node_prompt
+
             if node.task_use_tool and step.tool_name in tool_map:
                 node.task_tool_name = step.tool_name
                 node.task_tool = tool_map.get(node.task_tool_name)

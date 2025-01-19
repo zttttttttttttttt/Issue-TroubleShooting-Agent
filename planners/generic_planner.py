@@ -33,9 +33,57 @@ class GenericPlanner:
     A simple planner that calls the model to break a task into JSON steps.
     """
 
-    def __init__(self, model: str = None, log_level: Optional[str] = None):
+    DEFAULT_PROMPT = """\
+We have the following knowledge that might help: {knowledge}
+
+Given the following task and the possible tools, generate a detailed plan by breaking it down into actionable steps.
+Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name'.
+All steps should be encapsulated under the 'steps' key.
+
+Example:
+{example_json1}
+
+{example_json2}
+
+Task: {task}
+
+Tools: {tools_knowledge}
+
+Output ONLY valid JSON. No extra text or markdown.
+Steps:
+"""
+
+    EXAMPLE_JSON1 = """\
+{
+    "steps": [
+        {
+            "step_name": "Prepare eggs",
+            "step_description": "Get the eggs from the fridge and put them on the table.",
+            "use_tool": true,
+            "tool_name": "Event"
+        },
+        ...
+    ]
+}"""
+
+    EXAMPLE_JSON2 = """\
+{
+    "steps": [
+        {
+            "step_name": "Prepare eggs",
+            "step_description": "Get the eggs from the fridge and put them on the table.",
+            "use_tool": false
+        },
+        ...
+    ]
+}"""
+
+    def __init__(
+        self, model: str = None, log_level: Optional[str] = None, prompt: str = None
+    ):
         """
         If 'model' is not provided, the default model from config will be used.
+        'prompt' can override the default prompt used for planning.
         """
         self.logger = get_logger("generic-planner", log_level)
         if not model:
@@ -50,6 +98,17 @@ class GenericPlanner:
             )
         self.logger.info(f"GenericPlanner initialized with model: {self.model.name}")
 
+        self._prompt = prompt or self.DEFAULT_PROMPT
+
+    @property
+    def prompt(self) -> str:
+        """Get or set the single plan prompt (for dividing tasks into steps)."""
+        return self._prompt
+
+    @prompt.setter
+    def prompt(self, value: str):
+        self._prompt = value
+
     def plan(
         self, task: str, tools: Optional[List[BaseTool]], knowledge: str = ""
     ) -> List[Step]:
@@ -58,52 +117,23 @@ class GenericPlanner:
         'knowledge' is appended to the prompt to guide the planning process.
         """
         self.logger.info(f"Creating plan for task: {task}")
-        tools_knowledge = ""
+        tools_knowledge_list = []
         if tools is not None:
-            tools_knowledge = [
+            tools_knowledge_list = [
                 f"tool name: {tool.name}, tool description: {tool.description}"
                 for tool in tools
             ]
-        prompt = f"""
-        We have the following knowledge that might help: {knowledge}
+        tools_knowledge_str = "\n".join(tools_knowledge_list)
 
-        Given the following task and the possible tools, generate a detailed plan by breaking it down into actionable steps. 
-        Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name'.
-        All steps should be encapsulated under the 'steps' key.
+        final_prompt = self._prompt.format(
+            knowledge=knowledge,
+            task=task,
+            tools_knowledge=tools_knowledge_str,
+            example_json1=self.EXAMPLE_JSON1,
+            example_json2=self.EXAMPLE_JSON2,
+        )
 
-        Example:
-        {{
-            "steps": [
-                {{
-                    "step_name": "Prepare eggs",
-                    "step_description": "Get the eggs from the fridge and put them on the table."
-                    "use_tool": true,
-                    "tool_name": "Event"
-                }},
-                ...
-            ]
-        }}
-
-        {{
-            "steps": [
-                {{
-                    "step_name": "Prepare eggs",
-                    "step_description": "Get the eggs from the fridge and put them on the table."
-                    "use_tool": false
-                }},
-                ...
-            ]
-        }}
-
-        Task: {task}
-
-        Tools: {tools_knowledge}
-
-        Output ONLY valid JSON. No extra text or markdown.
-        Steps:
-        """
-
-        response = self.model.process(prompt)
+        response = self.model.process(final_prompt)
         response_text = str(response)
 
         if not response_text or not response_text.strip():

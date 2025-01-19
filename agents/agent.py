@@ -10,6 +10,30 @@ from config import Config
 
 
 class Agent:
+    """
+    The Agent coordinates task execution with or without a Planner.
+    It now exposes two prompts:
+      - direct_prompt (used when no planner is attached)
+      - summary_prompt (used in get_execution_result)
+    """
+
+    DEFAULT_DIRECT_PROMPT = """\
+Background: {background}
+Task: {task}
+"""
+
+    DEFAULT_SUMMARY_PROMPT = """\
+You are an assistant summarizing the outcome of a multi-step plan execution.
+Below is the complete step-by-step execution history. Provide a concise,
+well-structured summary describing how the solution was achieved and any
+notable details. Include each step's role in the final outcome.
+
+Execution History:
+{history_text}
+
+Summary:
+"""
+
     def __init__(self, model: Optional[str] = None, log_level: Optional[str] = None):
         """
         If 'model' is not provided, the default model from config will be used.
@@ -31,7 +55,10 @@ class Agent:
         self.knowledge = ""  # Used to guide how we make plans
         self.background = ""  # Used during execution steps
 
-        # If no model is passed, use the default from config
+        # Prompt strings for direct (no-planner) usage and summary
+        self._direct_prompt = self.DEFAULT_DIRECT_PROMPT
+        self._summary_prompt = self.DEFAULT_SUMMARY_PROMPT
+
         if not model:
             model = Config.DEFAULT_MODEL
 
@@ -39,6 +66,24 @@ class Agent:
         self.model = model
 
         self.logger.info("Agent instance created.")
+
+    @property
+    def direct_prompt(self) -> str:
+        """Prompt used when no planner is set (single-step)."""
+        return self._direct_prompt
+
+    @direct_prompt.setter
+    def direct_prompt(self, value: str):
+        self._direct_prompt = value
+
+    @property
+    def summary_prompt(self) -> str:
+        """Prompt used for final summarizing of execution history."""
+        return self._summary_prompt
+
+    @summary_prompt.setter
+    def summary_prompt(self, value: str):
+        self._summary_prompt = value
 
     @property
     def model(self):
@@ -84,9 +129,10 @@ class Agent:
 
         # Case 1: No planner => direct single-step
         if not self._planner:
-            # Incorporate background in the direct prompt
-            prompt = f"Background: {self.background}\nTask: {task}"
-            response = self._model.process(prompt)
+            final_prompt = self._direct_prompt.format(
+                background=self.background, task=task
+            )
+            response = self._model.process(final_prompt)
             self.logger.info(f"Response: {response}")
             self._execution_history.append(
                 {
@@ -149,21 +195,8 @@ class Agent:
             history_lines.append(line)
 
         history_text = "\n".join(history_lines)
-
-        # Construct a prompt for summarizing the entire execution
-        prompt = f"""
-You are an assistant summarizing the outcome of a multi-step plan execution.
-Below is the complete step-by-step execution history. Provide a concise,
-well-structured summary describing how the solution was achieved and any
-notable details. Include each step's role in the final outcome.
-
-Execution History:
-{history_text}
-
-Summary:
-"""
+        final_prompt = self._summary_prompt.format(history_text=history_text)
 
         self.logger.info("Generating final execution result (summary).")
-        summary_response = self._model.process(prompt)
-
+        summary_response = self._model.process(final_prompt)
         return str(summary_response)
