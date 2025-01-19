@@ -6,8 +6,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 
 from langchain_core.tools import BaseTool
-
-from utils.logger import Logger
+from utils.logger import get_logger
 from config import Config
 from validators import ScoreValidator
 from utils.context_manager import ContextManager
@@ -28,7 +27,7 @@ class Node:
     Represents a single node in the PlanGraph.
     """
 
-    logger = Logger()
+    logger = get_logger("graph-planner.node")  # minimal usage for node-level logs
     id: str
     task_description: str
     next_nodes: List[str] = field(default_factory=list)
@@ -318,9 +317,9 @@ class GraphPlanner(GenericPlanner):
     executes node-based logic with re-planning.
     """
 
-    def __init__(self, model: str = None):
-        super().__init__(model)
-        self.logger = Logger()
+    def __init__(self, model: str = None, log_level: Optional[str] = None):
+        super().__init__(model=model, log_level=log_level)
+        self.logger = get_logger("graph-planner", log_level)
         self.plan_graph: Optional[PlanGraph] = None
         self.context_manager = ContextManager()
         self._background = ""  # We'll store background for node execution

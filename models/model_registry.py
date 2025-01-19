@@ -8,9 +8,11 @@ import logging
 
 from config.config import load_config
 from .base_model import BaseModel  # Updated import
+from utils.logger import get_logger
+from config.config import Config
 
 
-def load_models_dynamically():
+def load_models_dynamically(logger):    
     """
     Dynamically load and register all model classes from the models package.
     """
@@ -35,7 +37,7 @@ def load_models_dynamically():
 
 class ModelRegistry:
     _models = {}
-    logger = logging.getLogger("LLMAgentFramework")
+    logger = get_logger("model-registry")
 
     @classmethod
     def register_model(cls, model: BaseModel):
@@ -47,12 +49,13 @@ class ModelRegistry:
         return cls._models.get(name, None)
 
     @classmethod
-    def load_models(cls):
-        load_config()  # Ensure configuration is loaded first
+    def load_models(cls, log_level: str = None):
+        load_config()  # Ensure configuration is loaded
+        logger = get_logger("model-loader", log_level)
         try:
-            load_models_dynamically()
+            load_models_dynamically(logger)
         except Exception as e:
-            cls.logger.error(f"Error loading models: {e}")
+            logger.error(f"Error loading models: {e}")
             raise
 
 

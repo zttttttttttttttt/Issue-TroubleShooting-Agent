@@ -1,15 +1,16 @@
 # validators/score_validator.py
 
 import re
+from utils.logger import get_logger
 
 
 class ScoreValidator:
-
-    def __init__(self, model):
+    def __init__(self, model, log_level=None):
         """
-        Pass in the agent's model instance (i.e., agent.model)
-        so we can call model.process(...) for validation prompts.
+        Pass in the agent's model instance so we can call model.process(...) for validation prompts.
+        Optionally specify log_level for debug or other logs.
         """
+        self.logger = get_logger("score-validator", log_level)
         self.model = model
 
     def create_validator_prompt(self, request, response):

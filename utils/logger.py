@@ -1,34 +1,28 @@
 # utils/logger.py
 
 import logging
+from config.config import Config
 
 
-class Logger:
-    def __init__(self):
-        self.logger = logging.getLogger("agent-core")
-        if not self.logger.handlers:
-            # Prevent adding multiple handlers in interactive environments
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-            self.logger.setLevel(
-                logging.DEBUG
-            )  # Set to DEBUG to capture debug messages
+def get_logger(name="agent-core", log_level: str = None) -> logging.Logger:
+    """
+    Retrieve a logger with the specified name.
+    If log_level is provided, override the default or global environment setting.
+    Otherwise, use Config.DEFAULT_LOG_LEVEL.
+    """
+    logger = logging.getLogger(name)
 
-    def debug(self, message: str):
-        self.logger.debug(message)
+    # If the logger has no handlers, add one (to avoid duplicated logs in multi-import environments).
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
 
-    def info(self, message: str):
-        self.logger.info(message)
+    # If a log_level is specified, use it; otherwise use the framework default
+    effective_level = log_level.upper() if log_level else Config.DEFAULT_LOG_LEVEL
+    logger.setLevel(effective_level)
 
-    def warning(self, message: str):
-        self.logger.warning(message)
-
-    def error(self, message: str):
-        self.logger.error(message)
-
-    def critical(self, message: str):
-        self.logger.critical(message)
+    return logger

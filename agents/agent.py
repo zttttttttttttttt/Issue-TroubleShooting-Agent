@@ -5,16 +5,17 @@ from typing import Optional, List
 from planners.generic_planner import GenericPlanner
 from planners.graph_planner import GraphPlanner
 from models.model_registry import ModelRegistry
-from utils.logger import Logger
+from utils.logger import get_logger
 from config import Config
 
 
 class Agent:
-    def __init__(self, model: Optional[str] = None):
+    def __init__(self, model: Optional[str] = None, log_level: Optional[str] = None):
         """
         If 'model' is not provided, the default model from config will be used.
+        'log_level' can override the framework-wide default for this Agent specifically.
         """
-        self.logger = Logger()
+        self.logger = get_logger("agent", log_level)
         self._model = None
         self._planner = None
         self.tools = None
@@ -27,7 +28,6 @@ class Agent:
         # }
         self._execution_history = []
 
-        # --- New fields ---
         self.knowledge = ""  # Used to guide how we make plans
         self.background = ""  # Used during execution steps
 

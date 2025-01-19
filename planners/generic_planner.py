@@ -6,7 +6,7 @@ from typing import List, Optional
 from langchain_core.tools import BaseTool
 
 from models.model_registry import ModelRegistry
-from utils.logger import Logger
+from utils.logger import get_logger
 from config import Config
 
 
@@ -33,11 +33,11 @@ class GenericPlanner:
     A simple planner that calls the model to break a task into JSON steps.
     """
 
-    def __init__(self, model: str = None):
+    def __init__(self, model: str = None, log_level: Optional[str] = None):
         """
         If 'model' is not provided, the default model from config will be used.
         """
-        self.logger = Logger()
+        self.logger = get_logger("generic-planner", log_level)
         if not model:
             model = Config.DEFAULT_MODEL
 
