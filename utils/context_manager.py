@@ -6,11 +6,19 @@ class ContextManager:
         self.context = {}
 
     def get_context(self):
+        """Return the underlying dictionary (if needed)."""
         return self.context
 
-    def get_new_context(self):
-        self.context = {}
+    def get_context_dict(self):
+        """Return the underlying dictionary (if needed)."""
         return self.context
+
+    def get_context_str(self):
+        return self.context_to_str(self)
+
+    def clear_context(self):
+        """Reset the context to an empty dict."""
+        self.context = {}
 
     def add_context(self, key, value):
         self.context[key] = value
@@ -24,12 +32,25 @@ class ContextManager:
             print(f"Key '{key}' not found in context.")
 
     def context_to_str(self):
+        """
+        If the context is empty, return an empty string.
+        Otherwise, wrap each key/value pair in <key></key> inside <context></context>.
+        """
+        if not self.context:
+            return ""
         context_str = "<context>\n"
         for key, value in self.context.items():
             context_str += f"<{key}>\n{value}\n</{key}>\n"
         context_str += "</context>"
         return context_str
 
-    def print_context(self):
-        print("Here is the context:")
-        print(self.context_to_str())
+    def __repr__(self):
+        """So print(context) shows the stored keys and values nicely."""
+        return f"ContextManager({self.context})"
+
+
+def get_context():
+    """
+    Return a new Context instance.
+    """
+    return ContextManager()

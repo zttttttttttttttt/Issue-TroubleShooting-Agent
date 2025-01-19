@@ -6,6 +6,7 @@ from planners.generic_planner import GenericPlanner
 from planners.graph_planner import GraphPlanner
 from models.model_registry import ModelRegistry
 from utils.logger import get_logger
+from utils.context_manager import get_context
 from config import Config
 
 
@@ -13,11 +14,12 @@ class Agent:
     """
     The Agent coordinates task execution with or without a Planner.
     It now exposes two prompts:
-      - direct_prompt (used when no planner is attached)
+      - execute_prompt: overrides how we generate the no-planner prompt
       - summary_prompt (used in get_execution_result)
     """
 
-    DEFAULT_DIRECT_PROMPT = """\
+    DEFAULT_EXECUTE_PROMPT = """\
+{context_section}
 Background: {background}
 Task: {task}
 """
@@ -52,11 +54,15 @@ Summary:
         # }
         self._execution_history = []
 
+        # Default knowledge / background
         self.knowledge = ""  # Used to guide how we make plans
         self.background = ""  # Used during execution steps
 
+        # The context manager (use get_context())
+        self._context = get_context()
+
         # Prompt strings for direct (no-planner) usage and summary
-        self._direct_prompt = self.DEFAULT_DIRECT_PROMPT
+        self._execute_prompt = self.DEFAULT_EXECUTE_PROMPT
         self._summary_prompt = self.DEFAULT_SUMMARY_PROMPT
 
         if not model:
@@ -68,13 +74,22 @@ Summary:
         self.logger.info("Agent instance created.")
 
     @property
-    def direct_prompt(self) -> str:
-        """Prompt used when no planner is set (single-step)."""
-        return self._direct_prompt
+    def context(self):
+        """
+        Expose the agent's context manager so we can do:
+          c = agent.context
+          c.add_context("role", "...")
+        """
+        return self._context
 
-    @direct_prompt.setter
-    def direct_prompt(self, value: str):
-        self._direct_prompt = value
+    @property
+    def execute_prompt(self) -> str:
+        """Prompt used when no planner is set (single-step)."""
+        return self._execute_prompt
+
+    @execute_prompt.setter
+    def execute_prompt(self, value: str):
+        self._execute_prompt = value
 
     @property
     def summary_prompt(self) -> str:
@@ -129,8 +144,12 @@ Summary:
 
         # Case 1: No planner => direct single-step
         if not self._planner:
-            final_prompt = self._direct_prompt.format(
-                background=self.background, task=task
+            # Possibly build a context_section from the context
+            context_section = self._context.context_to_str()
+            final_prompt = self._execute_prompt.format(
+                context_section=context_section,
+                background=self.background,
+                task=task,
             )
             response = self._model.process(final_prompt)
             self.logger.info(f"Response: {response}")
@@ -157,10 +176,15 @@ Summary:
             # (Note: If it's a GraphPlanner subclassing GenericPlanner, you'd hit the above if-check first.)
             self.logger.info(f"Executing plan with {len(steps)} steps.")
             for idx, step in enumerate(steps, 1):
-                # Incorporate background for each step’s prompt
-                step_prompt = f"Background: {self.background}\n{step.description}"
+                context_section = self._context.context_to_str()
+                # Possibly incorporate the context in the step prompt
+                final_prompt = self._execute_prompt.format(
+                    context_section=context_section,
+                    background=self.background,
+                    task=step.description,
+                )
                 self.logger.info(f"Executing Step {idx}: {step.description}")
-                response = self._model.process(step_prompt)
+                response = self._model.process(final_prompt)
                 self.logger.info(f"Response for Step {idx}: {response}")
 
                 # Record the step execution
