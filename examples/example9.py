@@ -14,6 +14,39 @@ from planners import GenericPlanner
 
 def main():
 
+    # 1) Overriding the ScoreValidator prompt
+    # validator = ScoreValidator(model=..., log_level="DEBUG")
+    # print("Default Validator Prompt:\n", validator.prompt)
+
+    # validator.prompt = """\
+    # You are a special validator focusing on only grammar correctness.
+    # Subtask: {request}
+    # Output: {response}
+    # Please check grammar only.
+    # """
+
+    # 2) Overriding the Agent's direct execution prompt
+    # agent = Agent()
+    # agent.direct_prompt = "Customized single-step prompt.\nTask: {task}\nBackground: {background}\n"
+    # agent.background = "I am a helpful assistant."
+
+    # result = agent.execute("Say hi to me.")
+    # print("Execution result:", result)
+
+    # 3) Overriding the final summary prompt
+    # agent.summary_prompt = "Here is a custom summary for steps:\n{history_text}"
+    # print(agent.get_execution_result())
+
+    # 4) Overriding the GenericPlanner prompt
+    # planner = GenericPlanner()
+    # planner.plan_prompt = """\
+    # I only want a single step:
+    # Task: {task}
+    # Tools: {tools_knowledge}
+    # Output JSON with one step.
+    # """
+    # agent.planner = planner
+
     agent = Agent(model="gpt-4o-mini")
 
     planner = GenericPlanner(model="gpt-3.5-turbo")
