@@ -12,7 +12,7 @@ from agents import Agent
 from planners import GenericPlanner
 
 # Setting Log Levels in Environment Variable
-# export LLM_AGENT_FRAMEWORK_LOG_LEVEL=DEBUG
+# export AGENT_CORE_LOG_LEVEL=DEBUG
 # python main.py
 
 # Setting Log Levels in Programmatic
