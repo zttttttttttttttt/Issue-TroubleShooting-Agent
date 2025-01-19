@@ -46,18 +46,18 @@ The result must not contain any explanatory note (like '// explain'). Provide a 
 
 Example:
 the example used tool:
-{
+{{
     "use_tool": true,
     "tool_name": "Event",
-    "tool_arguments": {
+    "tool_arguments": {{
         "eventId": "1000"
-    }
-}
+    }}
+}}
 the example used context:
-{
+{{
     "use_tool": false,
     "response": "result detail"
-}
+}}
 """
 
     id: str
@@ -97,7 +97,17 @@ the example used context:
 
         tool_description = ""
         if self.task_use_tool:
-            tool_description = str(self.task_tool.args_schema.model_json_schema())
+            if self.task_tool is None:
+                self.logger.warning(
+                    f"Node {self.id} indicates 'use_tool' but 'task_tool' is None. Skipping tool usage details."
+                )
+            elif hasattr(self.task_tool, "args_schema"):
+                tool_description = str(self.task_tool.args_schema.model_json_schema())
+            else:
+                self.logger.warning(
+                    f"Node {self.id} indicates 'use_tool' but the provided tool lacks 'args_schema'."
+                )
+                tool_description = f"[Tool: {self.task_tool_name}]"
 
         # Render final node prompt
         final_prompt = self._prompt.format(
@@ -114,10 +124,13 @@ the example used context:
         try:
             data = json.loads(cleaned)
             if data["use_tool"]:
-                response = (
-                    f"task tool description: {self.task_tool.description}\n"
-                    f"task tool response : {self.task_tool.invoke(data['tool_arguments'])}"
-                )
+                if self.task_tool is not None:
+                    response = (
+                        f"task tool description: {self.task_tool.description}\n"
+                        f"task tool response : {self.task_tool.invoke(data['tool_arguments'])}"
+                    )
+                else:
+                    response = "Tool usage was requested, but no tool is attached to this node."
             else:
                 response = data["response"]
         except json.JSONDecodeError as e:
@@ -340,7 +353,14 @@ Instructions:
         elif action == "breakdown":
             new_subtasks = adjustments.get("new_subtasks", [])
             if new_subtasks:
-                restart_node_id = new_subtasks[0].get("id")
+                restart_node_id = next(
+                    (st.get("id") for st in new_subtasks if "id" in st), None
+                )
+                if not restart_node_id:
+                    print(
+                        "No valid 'id' found in new_subtasks, cannot restart. Aborting."
+                    )
+                    return None
             else:
                 print("No subtasks found for breakdown action. Aborting execution.")
                 return None
@@ -409,8 +429,7 @@ class GraphPlanner(GenericPlanner):
             plan_graph.prompt = self._replan_prompt
 
         previous_node = None
-
-        tool_map = dict()
+        tool_map = {}
         if tools is not None:
             tool_map = {tool.name: tool for tool in tools}
 
@@ -481,7 +500,7 @@ def parse_llm_response(llm_response: str) -> Optional[str]:
 
 
 def apply_adjustments_to_plan(
-    plan_graph, node_id: str, adjustments_str: str, nodes_dict: Dict[str, Node]
+    plan_graph, node_id: str, adjustments_str: str, nodes_dict: Dict[str, "Node"]
 ):
     adjustments = json.loads(adjustments_str)
     action = adjustments.get("action")
@@ -489,16 +508,28 @@ def apply_adjustments_to_plan(
     if action == "breakdown":
         original_node = nodes_dict.pop(node_id, None)
         if not original_node:
+            plan_graph.logger.warning(
+                f"No original node found for ID='{node_id}'. Skipping."
+            )
             return
         new_subtasks = adjustments.get("new_subtasks", [])
         if not new_subtasks:
+            plan_graph.logger.warning(
+                "No 'new_subtasks' found for breakdown action. Skipping."
+            )
             return
 
         # Insert new subtasks as nodes
         for st in new_subtasks:
+            subtask_id = st.get("id")
+            if not subtask_id:
+                plan_graph.logger.warning(f"No 'id' in subtask: {st}. Skipping.")
+                continue
+
+            task_description = st.get("task_description", "No description provided.")
             new_node = Node(
-                id=st["id"],
-                task_description=st["task_description"],
+                id=subtask_id,
+                task_description=task_description,
                 next_nodes=original_node.next_nodes,
                 validation_threshold=st.get("validation_threshold", 0.8),
                 max_attempts=st.get("max_attempts", 3),
@@ -510,7 +541,12 @@ def apply_adjustments_to_plan(
             if node_id in n.next_nodes:
                 n.next_nodes.remove(node_id)
                 if new_subtasks:
-                    n.next_nodes.append(new_subtasks[0]["id"])
+                    # We link to the first newly created node only if it had an 'id'
+                    first_valid = next(
+                        (sub["id"] for sub in new_subtasks if "id" in sub), None
+                    )
+                    if first_valid:
+                        n.next_nodes.append(first_valid)
 
     elif action == "replan":
         restart_node_id = adjustments.get("restart_node_id")
@@ -518,12 +554,18 @@ def apply_adjustments_to_plan(
 
         for mod in modifications:
             if not isinstance(mod, dict):
-                print(f"Each modification must be a dict, got: {mod}")
+                plan_graph.logger.warning(
+                    f"Modification is not a dict: {mod}. Skipping."
+                )
                 continue
-            if "node_id" not in mod:
-                print(f"No 'node_id' in modification: {mod}")
+
+            mod_id = mod.get("node_id")
+            if not mod_id:
+                plan_graph.logger.warning(
+                    f"No 'node_id' in modification: {mod}. Skipping."
+                )
                 continue
-            mod_id = mod["node_id"]
+
             if mod_id in nodes_dict:
                 node = nodes_dict[mod_id]
                 node.task_description = mod.get(
@@ -535,9 +577,11 @@ def apply_adjustments_to_plan(
                 )
                 node.max_attempts = mod.get("max_attempts", node.max_attempts)
             else:
+                # If the node does not exist, create a new Node
+                new_description = mod.get("task_description", "No description")
                 new_node = Node(
                     id=mod_id,
-                    task_description=mod["task_description"],
+                    task_description=new_description,
                     next_nodes=mod.get("next_nodes", []),
                     validation_threshold=mod.get("validation_threshold", 0.8),
                     max_attempts=mod.get("max_attempts", 3),
@@ -555,4 +599,4 @@ def apply_adjustments_to_plan(
             plan_graph.add_node(new_node)
 
     else:
-        print("Unknown action in adjustments.")
+        plan_graph.logger.warning(f"Unknown action in adjustments: {action}")
