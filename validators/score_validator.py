@@ -2,9 +2,10 @@
 
 import re
 from utils.logger import get_logger
+from .base_validator import BaseValidator
 
 
-class ScoreValidator:
+class ScoreValidator(BaseValidator):
     DEFAULT_PROMPT = """\
 You are an expert validator of AI-generated outputs. Evaluate the provided subtask output based on the following criteria:
 
@@ -62,12 +63,6 @@ At the end:
     def prompt(self, value: str):
         self._prompt = value
 
-    def create_validator_prompt(self, request, response) -> str:
-        """
-        Render the current prompt template using the provided request and response.
-        """
-        return self._prompt.format(request=request, response=response)
-
     def parse_validation_response(self, validation_response):
         """
         Simple check if the model's textual response
@@ -123,13 +118,17 @@ At the end:
 
     def validate(self, request, response):
         """
-        1) Build a validation prompt from subtask description & output.
-        2) Call self.model.process(prompt).
-        3) Return the raw textual response.
+        Mandatory method from BaseValidator. Must return (decision, score, details).
         """
-        prompt_text = self.create_validator_prompt(request, response)
+        prompt_text = self._prompt.format(request=request, response=response)
         validation_response = self.model.process(prompt_text)
-        return validation_response
+        # return validation_response
+        decision, total_score, scores = self.parse_scored_validation_response(
+            validation_response
+        )
+
+        details = {"score_breakdown": scores, "raw_evaluation": validation_response}
+        return decision, total_score, details
 
 
 # Example usage as standalone script:

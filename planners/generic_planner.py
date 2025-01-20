@@ -13,31 +13,41 @@ from config import Config
 class Step:
     """
     Represents a step with a name and a description.
+    Now includes 'category' so we can determine which validator to use.
     """
 
-    def __init__(self, name: str, description: str, use_tool: bool, tool_name: str):
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        use_tool: bool,
+        tool_name: str,
+        category: str = "default",
+    ):
         self.name = name
         self.description = description
         self.use_tool = use_tool
         self.tool_name = tool_name
+        self.category = category
 
     def __repr__(self):
         return (
             f"Step(name='{self.name}', description='{self.description}', "
-            f"use_tool='{self.use_tool}', tool_name='{self.tool_name}')"
+            f"use_tool='{self.use_tool}', tool_name='{self.tool_name}', category='{self.category}')"
         )
 
 
 class GenericPlanner:
     """
     A simple planner that calls the model to break a task into JSON steps.
+    Each step may optionally specify a category, used for specialized validation.
     """
 
     DEFAULT_PROMPT = """\
 We have the following knowledge that might help: {knowledge}
 
 Given the following task and the possible tools, generate a detailed plan by breaking it down into actionable steps.
-Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name'.
+Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name', and 'step_category'.
 All steps should be encapsulated under the 'steps' key.
 
 Example:
@@ -60,7 +70,8 @@ Steps:
             "step_name": "Prepare eggs",
             "step_description": "Get the eggs from the fridge and put them on the table.",
             "use_tool": true,
-            "tool_name": "Event"
+            "tool_name": "Event",
+            "step_category": "action"
         },
         ...
     ]
@@ -70,9 +81,10 @@ Steps:
 {
     "steps": [
         {
-            "step_name": "Prepare eggs",
-            "step_description": "Get the eggs from the fridge and put them on the table.",
-            "use_tool": false
+            "step_name": "Plan code structure",
+            "step_description": "Outline the classes and methods.",
+            "use_tool": false,
+            "step_category": "coding"
         },
         ...
     ]
@@ -115,6 +127,7 @@ Steps:
         """
         Use the LLM to break down the task into multiple steps in JSON format.
         'knowledge' is appended to the prompt to guide the planning process.
+        Each step may include a 'step_category'.
         """
         self.logger.info(f"Creating plan for task: {task}")
         tools_knowledge_list = []
@@ -161,6 +174,8 @@ Steps:
             desc = sd.get("step_description")
             use_tool = sd.get("use_tool")
             tool_name = sd.get("tool_name")
+            category = sd.get("step_category", "default")
+
             if name and desc:
                 results.append(
                     Step(
@@ -168,6 +183,7 @@ Steps:
                         description=desc,
                         use_tool=use_tool,
                         tool_name=tool_name,
+                        category=category,
                     )
                 )
             else:
@@ -195,7 +211,13 @@ Steps:
                 step_name = step.get("step_name")
                 step_description = step.get("step_description")
                 if step_name and step_description:
-                    steps.append(Step(name=step_name, description=step_description))
+                    steps.append(
+                        Step(
+                            name=step_name,
+                            description=step_description,
+                            category=step.get("step_category", "default"),
+                        )
+                    )
                 else:
                     self.logger.warning(f"Incomplete step data: {step}")
             return steps

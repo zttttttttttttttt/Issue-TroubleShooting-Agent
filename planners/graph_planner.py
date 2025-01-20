@@ -72,6 +72,8 @@ the example used context:
     current_attempts: int = 0
     failed_reasons: List[str] = field(default_factory=list)
 
+    task_category: str = "default"
+
     # Store the node's prompt in an instance variable, defaulting to DEFAULT_PROMPT
     _prompt: str = field(default=DEFAULT_PROMPT, init=False)
 
@@ -150,21 +152,50 @@ the example used context:
         print(response)
         return response
 
-    def validate(self, result: str, model) -> float:
+    def validate(self, result: str, agent) -> float:
         """
-        Validate the node output using 'model' for the ScoreValidator.
+        Validate the node output using the agent's validator if enabled.
+        Return a float score that indicates success (>= threshold) or fail (< threshold).
         """
-        score = evaluate_result(self.task_description, result, model)
+        if not agent.validators_enabled:
+            # Validation is disabled; treat as success
+            return 1.0
+
+        validator = agent.validators.get(self.task_category, None)
+        if not validator:
+            self.logger.warning(
+                f"No validator found for category '{self.task_category}'. Validation skipped."
+            )
+            return 1.0
+
+        # We expect the validator to return (decision, numeric_score, details).
+        decision, score, details = validator.validate(self.task_description, result)
+
+        # For simplicity, interpret "score" as a 0..40 scale or similar. Convert to [0..1].
+        # If decision == "Rerun Subtask", we can treat it as failing the threshold.
+        if decision == "Rerun Subtask":
+            numeric_score = 0.0
+        else:
+            # Let's assume if score>35 => 1.0, else partial
+            numeric_score = float(score) / 40.0
+
         execution_result = ExecutionResult(
-            output=result, validation_score=score, timestamp=datetime.now()
+            output=result, validation_score=numeric_score, timestamp=datetime.now()
         )
         self.execution_results.append(execution_result)
-        return score
+        return numeric_score
 
     def should_replan(self) -> bool:
         if not self.execution_results:
             return False
-        last_score = self.execution_results[-1].validation_score
+        # The last item in execution_results might be a str or an ExecutionResult
+        last_entry = self.execution_results[-1]
+        if isinstance(last_entry, ExecutionResult):
+            last_score = last_entry.validation_score
+        else:
+            # If it's a raw string, no numeric score is available
+            return False
+
         if last_score >= self.validation_threshold:
             return False
         elif self.current_attempts >= self.max_attempts:
@@ -243,20 +274,28 @@ Instructions:
             self.start_node_id = node.id
 
     def execute_plan(
-        self, model, node_transformer: list, context_manager: ContextManager, background: str = ""
+        self,
+        model,
+        node_transformer: list,
+        context_manager: ContextManager,
+        background: str = "",
+        agent=None,
     ):
         """
         Executes each node in sequence. If a node fails validation, attempt replan.
+        'agent' is passed to use its validators if enabled.
         """
         self.current_node_id = self.current_node_id or self.start_node_id
         while self.current_node_id:
             if self.current_node_id not in self.nodes:
-                self.logger.error(f"Node {self.current_node_id} does not exist in the plan. Aborting execution.")
+                self.logger.error(
+                    f"Node {self.current_node_id} does not exist in the plan. Aborting execution."
+                )
                 break
 
             node = self.nodes[self.current_node_id]
             result = node.execute(model, context_manager, background=background)
-            score = node.validate(result, model)
+            score = node.validate(result, agent)
             self.logger.info(f"Node {node.id} execution score: {score}")
 
             if score >= node.validation_threshold:
@@ -288,7 +327,9 @@ Instructions:
                         if not self.current_node_id:
                             break
                     else:
-                        self.logger.error("Could not parse LLM response for replan, aborting.")
+                        self.logger.error(
+                            "Could not parse LLM response for replan, aborting."
+                        )
                         break
                 else:
                     # Retry the same node
@@ -303,7 +344,10 @@ Instructions:
             "execution_history": [
                 {
                     "node_id": n.id,
-                    "results": [er.validation_score for er in n.execution_results],
+                    "results": [
+                        er.validation_score if isinstance(er, ExecutionResult) else None
+                        for er in n.execution_results
+                    ],
                 }
                 for n in self.nodes.values()
             ],
@@ -473,7 +517,8 @@ class GraphPlanner(GenericPlanner):
             model=self.model,
             context_manager=self.context_manager,
             background=self._background,
-            node_transformer=node_transformer
+            node_transformer=node_transformer,
+            agent=None,  # We'll inject the agent from the Agent.execute() method
         )
         return node_transformer
 
@@ -540,6 +585,7 @@ def apply_adjustments_to_plan(
                 next_nodes=original_node.next_nodes,
                 validation_threshold=st.get("validation_threshold", 0.8),
                 max_attempts=st.get("max_attempts", 3),
+                task_category=st.get("step_category", "default"),
             )
             plan_graph.add_node(new_node)
 
@@ -583,6 +629,7 @@ def apply_adjustments_to_plan(
                     "validation_threshold", node.validation_threshold
                 )
                 node.max_attempts = mod.get("max_attempts", node.max_attempts)
+                node.task_category = mod.get("step_category", node.task_category)
             else:
                 # If the node does not exist, create a new Node
                 new_description = mod.get("task_description", "No description")
@@ -592,6 +639,7 @@ def apply_adjustments_to_plan(
                     next_nodes=mod.get("next_nodes", []),
                     validation_threshold=mod.get("validation_threshold", 0.8),
                     max_attempts=mod.get("max_attempts", 3),
+                    task_category=mod.get("step_category", "default"),
                 )
                 plan_graph.add_node(new_node)
 

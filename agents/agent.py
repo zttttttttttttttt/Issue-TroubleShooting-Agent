@@ -4,6 +4,8 @@ from typing import Optional, List
 
 from planners.generic_planner import GenericPlanner
 from planners.graph_planner import GraphPlanner
+from validators.default_mapping import create_default_validators
+from validators.base_validator import BaseValidator
 from models.model_registry import ModelRegistry
 from utils.logger import get_logger
 from utils.context_manager import get_context
@@ -71,6 +73,11 @@ Summary:
         # Use the property setter to initialize the model
         self.model = model
 
+        # NEW: Validator management
+        self.validators_enabled = False
+        self._validators = {}
+        self._load_default_validators()
+
         self.logger.info("Agent instance created.")
 
     @property
@@ -114,14 +121,20 @@ Summary:
         self.logger.info(f"Agent model set to: {model.name}")
 
     @property
-    def planner(self) -> Optional[GenericPlanner]:
+    def planner(self):
         return self._planner
 
     @planner.setter
-    def planner(self, planner: GenericPlanner):
-        if not isinstance(planner, GenericPlanner):
-            self.logger.error("Planner must be an instance of GenericPlanner.")
-            raise TypeError("Planner must be an instance of GenericPlanner.")
+    def planner(self, planner):
+        if not isinstance(planner, GenericPlanner) and not isinstance(
+            planner, GraphPlanner
+        ):
+            self.logger.error(
+                "Planner must be an instance of GenericPlanner or GraphPlanner."
+            )
+            raise TypeError(
+                "Planner must be an instance of GenericPlanner or GraphPlanner."
+            )
         self._planner = planner
         self.logger.info(f"Agent planner set to: {planner.__class__.__name__}")
 
@@ -133,11 +146,54 @@ Summary:
         """
         return self._execution_history
 
+    def _load_default_validators(self):
+        """
+        Load a default mapping of category -> validator (all referencing the current model).
+        Make a local copy so user modifications won't affect the original file.
+        """
+        defaults = create_default_validators(self._model)
+        self._validators = dict(defaults)
+
+    @property
+    def validators(self):
+        """
+        Return the current validator mapping (category -> validator).
+        """
+        return self._validators
+
+    def add_validator(self, category: str, validator: BaseValidator):
+        """
+        Insert or override a validator for the given category.
+        """
+        self._validators[category] = validator
+
+    def update_validator(self, category: str, validator: BaseValidator):
+        """
+        Update the validator for an existing category.
+        If the category doesn't exist, we log a warning and add it.
+        """
+        if category in self._validators:
+            self._validators[category] = validator
+        else:
+            self.logger.warning(
+                f"Category '{category}' not found in validators. Creating new entry."
+            )
+            self._validators[category] = validator
+
+    def enable_validators(self):
+        self.validators_enabled = True
+        self.logger.info("Validators have been enabled.")
+
+    def disable_validators(self):
+        self.validators_enabled = False
+        self.logger.info("Validators have been disabled.")
+
     def execute(self, task: str):
         """
-        1) If no planner, do direct execution with the model (use background).
-        2) If planner is GenericPlanner, run step-by-step (use background) and record each step.
-        3) If planner is GraphPlanner, call .plan(task), which automatically runs node-based planning
+        1) If no planner, do direct single-step with the model (use background).
+        2) If planner is GenericPlanner, run step-by-step (use background) + record each step.
+           *Now includes optional validation if validators_enabled.*
+        3) If planner is GraphPlanner, .plan(task) automatically runs node-based planning
            (using knowledge for plan generation and background for node execution).
         """
         self.logger.info(f"Agent is executing task: {task}")
@@ -187,6 +243,22 @@ Summary:
                 self.logger.info(f"Executing Step {idx}: {step.description}")
                 response = self._model.process(final_prompt)
                 self.logger.info(f"Response for Step {idx}: {response}")
+
+                # Optional validation
+                if self.validators_enabled:
+                    validator = self._validators.get(step.category, None)
+                    if validator:
+                        decision, score, details = validator.validate(
+                            step.description, response
+                        )
+                        self.logger.info(
+                            f"Validator Decision: {decision}, Score: {score}"
+                        )
+                        # Additional logic could be added here if decision == "Rerun Subtask"
+                    else:
+                        self.logger.warning(
+                            f"No validator found for category '{step.category}'. Skipping validation."
+                        )
 
                 # Record the step execution
                 self._execution_history.append(
