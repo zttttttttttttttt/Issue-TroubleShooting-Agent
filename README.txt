@@ -22,3 +22,42 @@ The embedded AEN represents the core traits of an Agent: adaptability, evolution
 PhAENix seamlessly integrates the mythical rebirth of the Phoenix with the LLM Agent’s core strengths, showcasing its adaptability, self-evolution, and ability to empower users by automating repetitive tasks.
 
 ---
+
+## Table of Contents
+
+1. [Installation](#installation)
+
+---
+
+## Installation
+
+#### 1. Clone the repository
+
+```bash
+git clone https://github.com/lukewu8023/agent-core.git
+cd agent-core
+```
+
+#### 2. (Optional) Create a virtual environment
+
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+```
+
+#### 3. Install the project as a library
+
+If there is a setup.py file in the root directory, you can do:
+
+```bash
+pip install -e .
+```
+
+If no setup.py is present, you can install by referencing the directory:
+
+```bash
+pip install -e path/to/agent-core
+```
+
+This will make the agents, planners, models, etc. available in your Python environment.
