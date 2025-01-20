@@ -198,7 +198,7 @@ Summary:
                 )
             return "Task execution completed using GenericPlanner."
 
-    def get_execution_result(self) -> str:
+    def get_execution_result_summary(self) -> str:
         """
         Produce an overall summary describing how the solution was completed,
         using the LLM (agent's model) to format the final explanation if desired.

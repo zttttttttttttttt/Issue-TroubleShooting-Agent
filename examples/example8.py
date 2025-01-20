@@ -33,7 +33,7 @@ def main():
 
     execution_history = agent.execution_history
     print(execution_history)
-    execution_result = agent.get_execution_result()
+    execution_result = agent.get_execution_result_summary()
     print(execution_result)
 
 
