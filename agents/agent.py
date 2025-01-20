@@ -168,6 +168,7 @@ Summary:
         # If the planner is GraphPlanner, .plan() already calls execute_plan() internally.
         # So we do NOT do the step-based for-loop here.
         if isinstance(self._planner, GraphPlanner):
+            self._execution_history = steps
             # Return after the graph-based plan is done
             return "Task execution completed using GraphPlanner."
 
