@@ -34,8 +34,8 @@ def get_metric(
 ) -> List:
     """Get metric data from prometheus by component name"""
     return [
-        {"name": "CPU Usage", "data": [[123456789, 10], [123456789, 12]]},
-        {"name": "Memory Usage", "data": [[123456789, 10], [123456789, 12]]},
+        {"component": "IE", "name": "CPU Usage", "desc": "the cpu usage of the component, unit is %", "data": [[123456789, 10], [123456789, 12]]},
+        {"component": "IE", "name": "Memory Usage", "desc": "the memory usage of the component, unit is %", "data": [[123456789, 10], [123456789, 12]]},
     ]
 
 
@@ -63,17 +63,17 @@ def get_trace(trace_id: Annotated[str, "trace id"]) -> List:
 
 
 def main():
-    agent = Agent(model="gpt-3.5-turbo")
+    agent = Agent(model="gpt-4o-mini")
 
     agent.tools = [get_event, get_metric, get_log, get_trace]
     agent.planner = GraphPlanner()
 
-    task = "What's going on for event id 10000 in IE component?"
+    task = "Find the specifics root cause and get more detail about why the event id: 10000 in IE component failed?"
     agent.execute(task)
 
     execution_history = agent.execution_history
     print(execution_history)
-    execution_result = agent.get_execution_result()
+    execution_result = agent.get_execution_result_summary()
     print(execution_result)
 
 

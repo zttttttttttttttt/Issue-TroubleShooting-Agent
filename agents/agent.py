@@ -168,6 +168,7 @@ Summary:
         # If the planner is GraphPlanner, .plan() already calls execute_plan() internally.
         # So we do NOT do the step-based for-loop here.
         if isinstance(self._planner, GraphPlanner):
+            self._execution_history = steps
             # Return after the graph-based plan is done
             return "Task execution completed using GraphPlanner."
 
@@ -197,7 +198,7 @@ Summary:
                 )
             return "Task execution completed using GenericPlanner."
 
-    def get_execution_result(self) -> str:
+    def get_execution_result_summary(self) -> str:
         """
         Produce an overall summary describing how the solution was completed,
         using the LLM (agent's model) to format the final explanation if desired.

@@ -161,7 +161,7 @@ Steps:
             desc = sd.get("step_description")
             use_tool = sd.get("use_tool")
             tool_name = sd.get("tool_name")
-            if name and desc and use_tool:
+            if name and desc:
                 results.append(
                     Step(
                         name=name,

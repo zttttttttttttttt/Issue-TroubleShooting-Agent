@@ -31,7 +31,7 @@ def main():
     task = "draw a flower"
     agent.execute(task)
 
-    execution_result = agent.get_execution_result()
+    execution_result = agent.get_execution_result_summary()
     print(execution_result)
 
 

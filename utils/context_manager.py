@@ -14,7 +14,7 @@ class ContextManager:
         return self.context
 
     def get_context_str(self):
-        return self.context_to_str(self)
+        return self.context_to_str()
 
     def clear_context(self):
         """Reset the context to an empty dict."""

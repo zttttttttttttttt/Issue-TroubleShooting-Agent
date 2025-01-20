@@ -7,11 +7,9 @@ from typing import List, Dict, Optional
 
 from langchain_core.tools import BaseTool
 from utils.logger import get_logger
-from config import Config
 from validators import ScoreValidator
 from utils.context_manager import ContextManager
 from .generic_planner import GenericPlanner, Step
-from models.model_registry import ModelRegistry
 
 
 @dataclass
@@ -148,6 +146,7 @@ the example used context:
         task response: {response}
         """,
         )
+        self.execution_results.append(response)
         print(response)
         return response
 
@@ -244,7 +243,7 @@ Instructions:
             self.start_node_id = node.id
 
     def execute_plan(
-        self, model, context_manager: ContextManager, background: str = ""
+        self, model, node_transformer: list, context_manager: ContextManager, background: str = ""
     ):
         """
         Executes each node in sequence. If a node fails validation, attempt replan.
@@ -252,26 +251,32 @@ Instructions:
         self.current_node_id = self.current_node_id or self.start_node_id
         while self.current_node_id:
             if self.current_node_id not in self.nodes:
-                print(
-                    f"Node {self.current_node_id} does not exist in the plan. Aborting execution."
-                )
+                self.logger.error(f"Node {self.current_node_id} does not exist in the plan. Aborting execution.")
                 break
 
             node = self.nodes[self.current_node_id]
             result = node.execute(model, context_manager, background=background)
             score = node.validate(result, model)
-            print(f"Node {node.id} execution score: {score}")
+            self.logger.info(f"Node {node.id} execution score: {score}")
 
             if score >= node.validation_threshold:
+                node.result = result
+                node_transformer.append(
+                    {
+                        "step_name": node.id,
+                        "step_description": node.task_description,
+                        "step_result": str(result),
+                    }
+                )
                 # Move on
                 if node.next_nodes:
                     self.current_node_id = node.next_nodes[0]
                 else:
-                    print("Plan execution completed successfully.")
+                    self.logger.info("Plan execution completed successfully.")
                     break
             else:
                 if node.should_replan():
-                    print(f"Replanning needed at Node {node.id}")
+                    self.logger.warning(f"Replanning needed at Node {node.id}")
                     failure_info = self.prepare_failure_info(node)
                     replan_response = self.call_llm_for_replan(
                         model, failure_info, context_manager
@@ -283,11 +288,11 @@ Instructions:
                         if not self.current_node_id:
                             break
                     else:
-                        print("Could not parse LLM response for replan, aborting.")
+                        self.logger.error("Could not parse LLM response for replan, aborting.")
                         break
                 else:
                     # Retry the same node
-                    print(f"Retrying Node {node.id}")
+                    self.logger.warning(f"Retrying Node {node.id}")
                     continue
 
     def prepare_failure_info(self, node: Node) -> Dict:
@@ -463,12 +468,14 @@ class GraphPlanner(GenericPlanner):
         self.logger.info("PlanGraph built. Executing now...")
 
         # Execute the plan with background
+        node_transformer = list()
         self.plan_graph.execute_plan(
             model=self.model,
             context_manager=self.context_manager,
             background=self._background,
+            node_transformer=node_transformer
         )
-        return steps
+        return node_transformer
 
 
 #
