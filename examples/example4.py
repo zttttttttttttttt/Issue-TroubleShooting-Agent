@@ -21,9 +21,9 @@ def main():
     agent.execute(task)
 
     execution_history = agent.execution_history
-    print(execution_history)
+    print(f"Execution History: {execution_history}")
     execution_result = agent.get_execution_result_summary()
-    print(execution_result)
+    print(f"Execution Result: {execution_result}")
 
 
 if __name__ == "__main__":

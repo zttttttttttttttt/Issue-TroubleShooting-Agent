@@ -42,7 +42,7 @@ def main():
 
     # 6) Summarize the execution
     execution_result = agent.get_execution_result_summary()
-    print(execution_result)
+    print(f"Execution Result: {execution_result}")
 
 
 if __name__ == "__main__":
