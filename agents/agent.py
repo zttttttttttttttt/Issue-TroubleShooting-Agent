@@ -219,12 +219,12 @@ Summary:
             return response
 
         # Case 2: Using a planner => pass knowledge to the plan
-        steps = self._planner.plan(task, self.tools, knowledge=self.knowledge)
+        steps = self._planner.plan(task, self.tools, execute_history=self._execution_history, knowledge=self.knowledge,
+                                   background=self.background, agent=self)
 
         # If the planner is GraphPlanner, .plan() already calls execute_plan() internally.
         # So we do NOT do the step-based for-loop here.
         if isinstance(self._planner, GraphPlanner):
-            self._execution_history = steps
             # Return after the graph-based plan is done
             return "Task execution completed using GraphPlanner."
 

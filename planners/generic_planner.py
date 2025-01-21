@@ -36,6 +36,16 @@ class Step:
             f"use_tool='{self.use_tool}', tool_name='{self.tool_name}', category='{self.category}')"
         )
 
+    def to_dict(self):
+        # Convert the object to a dictionary that can be serialized to JSON
+        return {
+            "name": self.name,
+            "description": self.description,
+            "use_tool": self.use_tool,
+            "tool_name": self.tool_name,
+            "category": self.category,
+        }
+
 
 class GenericPlanner:
     """
@@ -44,20 +54,34 @@ class GenericPlanner:
     """
 
     DEFAULT_PROMPT = """\
-We have the following knowledge that might help: {knowledge}
+We have the following knowledge that might help: 
 
-Given the following task and the possible tools, generate a detailed plan by breaking it down into actionable steps.
+############
+Knowledge:
+{knowledge}
+############
+
+Given the following task and the possible tools, generate a plan based on provided knowledge by breaking it down into actionable steps.
 Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name', and 'step_category'.
+And if need to use the tool, please make sure 'step_description' should contain tool's properties needed information
 All steps should be encapsulated under the 'steps' key.
 
+############
 Example:
 {example_json1}
 
 {example_json2}
+############
 
-Task: {task}
+Task: 
+############
+{task}
+############
 
-Tools: {tools_knowledge}
+Tools:
+############
+{tools_knowledge}
+############
 
 Output ONLY valid JSON. No extra text or markdown.
 Steps:
@@ -133,7 +157,7 @@ Steps:
         tools_knowledge_list = []
         if tools is not None:
             tools_knowledge_list = [
-                f"tool name: {tool.name}, tool description: {tool.description}"
+                str(tool.args_schema.model_json_schema())
                 for tool in tools
             ]
         tools_knowledge_str = "\n".join(tools_knowledge_list)

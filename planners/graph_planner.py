@@ -276,7 +276,7 @@ Instructions:
     def execute_plan(
         self,
         model,
-        node_transformer: list,
+        execute_history: list,
         context_manager: ContextManager,
         background: str = "",
         agent=None,
@@ -300,7 +300,7 @@ Instructions:
 
             if score >= node.validation_threshold:
                 node.result = result
-                node_transformer.append(
+                execute_history.append(
                     {
                         "step_name": node.id,
                         "step_description": node.task_description,
@@ -459,8 +459,10 @@ class GraphPlanner(GenericPlanner):
         self,
         task: str,
         tools: Optional[List[BaseTool]],
+        execute_history: list = None,
         knowledge: str = "",
         background: str = "",
+        agent=None
     ) -> List[Step]:
         """
         1) Use the base class to get Steps, guided by `knowledge`.
@@ -512,15 +514,14 @@ class GraphPlanner(GenericPlanner):
         self.logger.info("PlanGraph built. Executing now...")
 
         # Execute the plan with background
-        node_transformer = list()
         self.plan_graph.execute_plan(
             model=self.model,
             context_manager=self.context_manager,
             background=self._background,
-            node_transformer=node_transformer,
-            agent=None,  # We'll inject the agent from the Agent.execute() method
+            execute_history=execute_history,
+            agent=agent,  # We'll inject the agent from the Agent.execute() method
         )
-        return node_transformer
+        return steps
 
 
 #
