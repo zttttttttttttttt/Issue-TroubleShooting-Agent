@@ -141,7 +141,13 @@ Steps:
         self._prompt = value
 
     def plan(
-        self, task: str, tools: Optional[List[BaseTool]], knowledge: str = ""
+        self,
+        task: str,
+        tools: Optional[List[BaseTool]],
+        execute_history: list = None,
+        knowledge: str = "",
+        background: str = "",
+        agent=None,
     ) -> List[Step]:
         """
         Use the LLM to break down the task into multiple steps in JSON format.
@@ -152,8 +158,7 @@ Steps:
         tools_knowledge_list = []
         if tools is not None:
             tools_knowledge_list = [
-                str(tool.args_schema.model_json_schema())
-                for tool in tools
+                str(tool.args_schema.model_json_schema()) for tool in tools
             ]
         tools_knowledge_str = "\n".join(tools_knowledge_list)
 
