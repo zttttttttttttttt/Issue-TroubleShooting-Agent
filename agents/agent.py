@@ -310,7 +310,7 @@ Summary:
 def background_format(background: str):
 
     background_str = ""
-    if background != '':
+    if background != "":
         background_str = "<Background>\n"
         background_str += f"{background}\n"
         background_str += "</Background>\n"
