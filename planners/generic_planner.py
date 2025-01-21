@@ -54,34 +54,29 @@ class GenericPlanner:
     """
 
     DEFAULT_PROMPT = """\
-We have the following knowledge that might help: 
-
-############
-Knowledge:
-{knowledge}
-############
-
+    
 Given the following task and the possible tools, generate a plan based on provided knowledge by breaking it down into actionable steps.
 Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name', and 'step_category'.
 And if need to use the tool, please make sure 'step_description' should contain tool's properties needed information
 All steps should be encapsulated under the 'steps' key.
 
-############
-Example:
+<Knowledge>
+{knowledge}
+</Knowledge>
+
+<Examples>
 {example_json1}
 
 {example_json2}
-############
+</Examples>
 
-Task: 
-############
-{task}
-############
-
-Tools:
-############
+<Tools>
 {tools_knowledge}
-############
+</Tools>
+
+<Task>
+{task}
+</Task>
 
 Output ONLY valid JSON. No extra text or markdown.
 Steps:
