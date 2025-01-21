@@ -22,8 +22,10 @@ class Agent:
 
     DEFAULT_EXECUTE_PROMPT = """\
 {context_section}
-Background: {background}
-Task: {task}
+{background}
+<Task> 
+{task}
+</Task>
 """
 
     DEFAULT_SUMMARY_PROMPT = """\
@@ -204,7 +206,7 @@ Summary:
             context_section = self._context.context_to_str()
             final_prompt = self._execute_prompt.format(
                 context_section=context_section,
-                background=self.background,
+                background=background_format(self.background),
                 task=task,
             )
             response = self._model.process(final_prompt)
@@ -219,8 +221,14 @@ Summary:
             return response
 
         # Case 2: Using a planner => pass knowledge to the plan
-        steps = self._planner.plan(task, self.tools, execute_history=self._execution_history, knowledge=self.knowledge,
-                                   background=self.background, agent=self)
+        steps = self._planner.plan(
+            task,
+            self.tools,
+            execute_history=self._execution_history,
+            knowledge=self.knowledge,
+            background=background_format(self.background),
+            agent=self,
+        )
 
         # If the planner is GraphPlanner, .plan() already calls execute_plan() internally.
         # So we do NOT do the step-based for-loop here.
@@ -237,7 +245,7 @@ Summary:
                 # Possibly incorporate the context in the step prompt
                 final_prompt = self._execute_prompt.format(
                     context_section=context_section,
-                    background=self.background,
+                    background=background_format(self.background),
                     task=step.description,
                 )
                 self.logger.info(f"Executing Step {idx}: {step.description}")
@@ -297,3 +305,13 @@ Summary:
         self.logger.info("Generating final execution result (summary).")
         summary_response = self._model.process(final_prompt)
         return str(summary_response)
+
+
+def background_format(background: str):
+
+    background_str = ""
+    if background != '':
+        background_str = "<Background>\n"
+        background_str += f"{background}\n"
+        background_str += "</Background>\n"
+    return background_str
