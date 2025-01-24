@@ -1,10 +1,12 @@
 # config/config.py
 
 import os
-import logging
 
 
 class Config:
+
+    api_base: str = os.environ["OPENAI_API_BASE"]
+    api_key: str = os.environ["OPENAI_API_KEY"]
 
     # Default log level (turn off informational logs by default)
     # If user sets the env var AGENT_CORE_LOG_LEVEL, we override
@@ -25,11 +27,10 @@ class Config:
     DEFAULT_MODEL = "gpt-4o-mini"  # Default model name
     # You can add more configuration constants here as needed
 
-
-def load_config():
-    """
-    Load configuration settings into environment variables.
-    """
-    os.environ["OPENAI_API_BASE"] = "https://api.ohmygpt.com/v1/"
-    os.environ["OPENAI_API_KEY"] = ""
-    # Add more environment variables or configurations here as needed
+    def load_config(self):
+        """
+        Load configuration settings into environment variables.
+        """
+        os.environ["OPENAI_API_BASE"] = self.api_base
+        os.environ["OPENAI_API_KEY"] = self.api_key
+        # Add more environment variables or configurations here as needed
