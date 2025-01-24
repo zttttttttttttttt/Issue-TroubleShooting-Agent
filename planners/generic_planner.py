@@ -54,6 +54,7 @@ class GenericPlanner:
     """
 
     DEFAULT_PROMPT = """\
+The possible categories for each step are: {categories_str}, try to categorize step to one of these categories, if not, define new category and put in step_category.
     
 Given the following task and the possible tools, generate a plan based on provided knowledge by breaking it down into actionable steps.
 Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name', and 'step_category'.
@@ -147,12 +148,13 @@ Steps:
         execute_history: list = None,
         knowledge: str = "",
         background: str = "",
+        categories: Optional[List[str]] = None,
         agent=None,
     ) -> List[Step]:
         """
         Use the LLM to break down the task into multiple steps in JSON format.
         'knowledge' is appended to the prompt to guide the planning process.
-        Each step may include a 'step_category'.
+        If 'categories' is provided, we pass it to the LLM so it can properly categorize each step.
         """
         self.logger.info(f"Creating plan for task: {task}")
         tools_knowledge_list = []
@@ -162,12 +164,18 @@ Steps:
             ]
         tools_knowledge_str = "\n".join(tools_knowledge_list)
 
+        if categories:
+            categories_str = ", ".join(categories)
+        else:
+            categories_str = "(Not defined)"
+
         final_prompt = self._prompt.format(
             knowledge=knowledge,
             task=task,
             tools_knowledge=tools_knowledge_str,
             example_json1=self.EXAMPLE_JSON1,
             example_json2=self.EXAMPLE_JSON2,
+            categories_str=categories_str,
         )
 
         response = self.model.process(final_prompt)
@@ -191,6 +199,8 @@ Steps:
             self.logger.error(f"Raw LLM response was: {cleaned}")
             raise ValueError("Invalid JSON format in planner response.")
 
+        valid_categories = set(categories) if categories else set()
+
         # Convert steps_data to Step objects
         results = []
         for sd in steps_data:
@@ -198,7 +208,10 @@ Steps:
             desc = sd.get("step_description")
             use_tool = sd.get("use_tool")
             tool_name = sd.get("tool_name")
-            category = sd.get("step_category", "default")
+            raw_cat = sd.get("step_category", "default")
+
+            # If LLM returned a category not in recognized set, fallback to 'default'
+            final_cat = raw_cat if raw_cat in valid_categories else "default"
 
             if name and desc:
                 results.append(
@@ -207,7 +220,7 @@ Steps:
                         description=desc,
                         use_tool=use_tool,
                         tool_name=tool_name,
-                        category=category,
+                        category=final_cat,
                     )
                 )
             else:

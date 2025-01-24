@@ -156,15 +156,22 @@ the example used context:
         """
         Validate the node output using the agent's validator if enabled.
         Return a float score that indicates success (>= threshold) or fail (< threshold).
+
+        Fallback to 'default' if self.task_category not in agent.validators.
         """
-        if not agent.validators_enabled:
+        if not agent or not agent.validators_enabled:
             # Validation is disabled; treat as success
             return 1.0
 
-        validator = agent.validators.get(self.task_category, None)
+        # Minimal change: fallback to 'default' if unknown category
+        chosen_cat = (
+            self.task_category if self.task_category in agent.validators else "default"
+        )
+
+        validator = agent.validators.get(chosen_cat, None)
         if not validator:
             self.logger.warning(
-                f"No validator found for category '{self.task_category}'. Validation skipped."
+                f"No validator found for category '{chosen_cat}'. Validation skipped."
             )
             return 1.0
 
@@ -462,7 +469,7 @@ class GraphPlanner(GenericPlanner):
         execute_history: list = None,
         knowledge: str = "",
         background: str = "",
-        agent=None
+        agent=None,
     ) -> List[Step]:
         """
         1) Use the base class to get Steps, guided by `knowledge`.
@@ -495,6 +502,7 @@ class GraphPlanner(GenericPlanner):
                 next_nodes=[next_node_id] if next_node_id else [],
                 validation_threshold=0.8,
                 max_attempts=3,
+                task_category=step.category,  # tie the step's category to the node
             )
             # If user gave a custom node prompt, override
             if self._node_prompt:

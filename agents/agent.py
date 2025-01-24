@@ -4,7 +4,7 @@ from typing import Optional, List
 
 from planners.generic_planner import GenericPlanner
 from planners.graph_planner import GraphPlanner
-from validators.default_mapping import create_default_validators
+from validators.validators import get_validators
 from validators.base_validator import BaseValidator
 from models.model_registry import ModelRegistry
 from utils.logger import get_logger
@@ -153,8 +153,8 @@ Summary:
         Load a default mapping of category -> validator (all referencing the current model).
         Make a local copy so user modifications won't affect the original file.
         """
-        defaults = create_default_validators(self._model)
-        self._validators = dict(defaults)
+        validators = get_validators(self._model)
+        self._validators = dict(validators)
 
     @property
     def validators(self):
@@ -221,12 +221,17 @@ Summary:
             return response
 
         # Case 2: Using a planner => pass knowledge to the plan
+
+        # If we have a planner, pass the current list of categories
+        current_categories = list(self._validators.keys())
+
         steps = self._planner.plan(
             task,
             self.tools,
             execute_history=self._execution_history,
             knowledge=self.knowledge,
             background=background_format(self.background),
+            categories=current_categories,
             agent=self,
         )
 
@@ -254,7 +259,13 @@ Summary:
 
                 # Optional validation
                 if self.validators_enabled:
-                    validator = self._validators.get(step.category, None)
+                    # If the step's category isn't in our mapping, fallback to "default"
+                    chosen_cat = (
+                        step.category
+                        if step.category in self._validators
+                        else "default"
+                    )
+                    validator = self._validators.get(chosen_cat)
                     if validator:
                         decision, score, details = validator.validate(
                             step.description, response
@@ -265,7 +276,7 @@ Summary:
                         # Additional logic could be added here if decision == "Rerun Subtask"
                     else:
                         self.logger.warning(
-                            f"No validator found for category '{step.category}'. Skipping validation."
+                            f"No validator found even for 'default' category. Skipping validation."
                         )
 
                 # Record the step execution
