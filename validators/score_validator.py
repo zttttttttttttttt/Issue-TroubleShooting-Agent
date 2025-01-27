@@ -1,8 +1,10 @@
 # validators/score_validator.py
 
 import re
+from typing import Optional
 from utils.logger import get_logger
 from .base_validator import BaseValidator
+from config import Config
 
 
 class ScoreValidator(BaseValidator):
@@ -44,14 +46,24 @@ At the end:
 **Evaluation:**
 """
 
-    def __init__(self, model, log_level=None, prompt: str = None):
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        log_level: Optional[str] = None,
+        prompt: str = None,
+    ):
         """
         Pass in the agent's model instance so we can call model.process(...) for validation prompts.
         Optionally specify log_level for debug or other logs.
         'prompt' can override the default prompt template.
         """
         self.logger = get_logger("score-validator", log_level)
+
+        if not model:
+            model = Config.DEFAULT_MODEL
+
         self.model = model
+        
         self._prompt = prompt or self.DEFAULT_PROMPT
 
     @property
