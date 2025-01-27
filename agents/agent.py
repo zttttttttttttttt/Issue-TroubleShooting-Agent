@@ -9,6 +9,7 @@ from validators.base_validator import BaseValidator
 from models.model_registry import ModelRegistry
 from utils.logger import get_logger
 from utils.context_manager import get_context
+from utils.llm_chat import LLMChat
 from config import Config
 
 
@@ -79,6 +80,10 @@ Summary:
         self.validators_enabled = False
         self._validators = {}
         self._load_default_validators()
+
+        # Provide an LLM tool instance so user can do `agent.llm_chat.process(...)`
+        self.llm_chat = LLMChat(self._model.name, log_level)
+        self.logger.info("Agent instance created with a LLM chat tool.")
 
         self.logger.info("Agent instance created.")
 
