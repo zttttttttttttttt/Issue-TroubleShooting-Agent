@@ -35,7 +35,7 @@ Now, produce your evaluation:
         If model_name is None, use the default model from Config.
         This class can be used to do both summarization and text-critique.
         """
-        self.logger = get_logger("llm_chat", log_level)
+        self.logger = get_logger("llm-chat", log_level)
         if not model_name:
             model_name = Config.DEFAULT_MODEL
 
