@@ -14,8 +14,8 @@ from planners import GenericPlanner
 
 def main():
 
-    agent = Agent(model="gpt-4o-mini")
-    agent.planner = GenericPlanner(model="gpt-3.5-turbo")
+    agent = Agent()
+    agent.planner = GenericPlanner()
 
     task = "3 steps draw a flower"
     agent.execute(task)

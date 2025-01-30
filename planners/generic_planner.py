@@ -55,10 +55,20 @@ class GenericPlanner:
 
     DEFAULT_PROMPT = """ 
 Given the following task and the possible tools, generate a plan based on provided knowledge by breaking it down into actionable steps.
-Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name', and 'step_category'.
-And if need to use the tool, please make sure 'step_description' should contain tool's properties needed information
-All steps should be encapsulated under the 'steps' key.
-The possible categories for each step are: {categories_str}, try to categorize step to one of these categories, if not, define new category and put in step_category.
+
+**Instructions for generating 'use_tool':**
+1) If the content between the <Tools></Tools> is empty, you MUST set "use_tool" to false for every step, and omit the "tool_name" key.
+2) If the <Tools></Tools> area has content, you MAY set "use_tool" to true when appropriate. 
+   - If "use_tool" is true, be sure to include "tool_name" in that step.
+   - Also ensure "step_description" references any necessary tool properties or arguments.
+
+**Task Breakdown Requirements:**
+1) All steps should be encapsulated under the "steps" key in valid JSON.
+2) Present each step in JSON format with the attributes:
+  "step_name", "step_description", "use_tool", optionally "tool_name", and "step_category".
+3) The possible categories for each step are: {categories_str}.
+  If you cannot fit into any existing category, define a new category in "step_category".
+4) Output **ONLY** valid JSON. No extra text, no Markdown.
 
 <Knowledge>
 {knowledge}
@@ -66,7 +76,6 @@ The possible categories for each step are: {categories_str}, try to categorize s
 
 <Examples>
 {example_json1}
-
 {example_json2}
 </Examples>
 
