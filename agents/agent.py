@@ -251,6 +251,11 @@ Summary:
             # (Note: If it's a GraphPlanner subclassing GenericPlanner, you'd hit the above if-check first.)
             self.logger.info(f"Executing plan with {len(steps)} steps.")
             for idx, step in enumerate(steps, 1):
+                if self._execution_history:
+                    self._context.add_context(
+                        "Execution History",
+                        execution_history_to_str(self._execution_history),
+                    )
                 context_section = self._context.context_to_str()
                 # Possibly incorporate the context in the step prompt
                 final_prompt = self._execute_prompt.format(
@@ -305,22 +310,27 @@ Summary:
                 "(If you used GraphPlanner, the node-based execution is stored inside the planner.)"
             )
 
-        # Build a textual representation of the execution history
-        history_lines = []
-        for idx, record in enumerate(self._execution_history, 1):
-            line = (
-                f"Step {idx}: {record['step_name']}\n"
-                f"Description: {record['step_description']}\n"
-                f"Result: {record['step_result']}\n"
-            )
-            history_lines.append(line)
-
-        history_text = "\n".join(history_lines)
+        history_text = execution_history_to_str(self._execution_history)
         final_prompt = self._summary_prompt.format(history_text=history_text)
 
         self.logger.info("Generating final execution result (summary).")
         summary_response = self._model.process(final_prompt)
         return str(summary_response)
+
+
+# Build a textual representation of the execution history
+def execution_history_to_str(execution_history: list):
+    history_lines = []
+    for idx, record in enumerate(execution_history, 1):
+        line = (
+            f"Step {idx}: {record['step_name']}\n"
+            f"Description: {record['step_description']}\n"
+            f"Result: {record['step_result']}\n"
+        )
+        history_lines.append(line)
+
+    history_text = "\n".join(history_lines)
+    return history_text
 
 
 def background_format(background: str):
