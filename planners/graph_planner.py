@@ -28,17 +28,26 @@ class Node:
     logger = get_logger("graph-planner.node")  # minimal usage for node-level logs
 
     # Expose Node's default prompt for execution
-    DEFAULT_PROMPT = """\
+    DEFAULT_PROMPT = """
+
+<Background>
+{background}
+</Background>
+
 {context}
-Background: {background}
+
 Now, process the above context and handle the following task:
+
+<Task>
 Task Desc: {task_description}
+</Task>
+
+<Tool Use>
 Task Use Tool: {task_use_tool}
 Task Tool Description: {tool_description}
-If Task Use Tool is `False`, process according to the `Task Description`
-If Task Use Tool is `True`, process according to the `Task Tool`,
-For each tool argument, based on context and human's question to generate arguments value
-according to the argument description.
+If Task Use Tool is `False`, process according to the `Task Description`,
+If Task Use Tool is `True`, process according to the `Task Tool`,,
+For each tool argument, based on context and human's question to generate arguments value according to the argument description.
 
 The result must not contain any explanatory note (like '// explain'). Provide a pure JSON string that can be parsed.
 
@@ -56,6 +65,7 @@ the example used context:
     "use_tool": false,
     "response": "result detail"
 }}
+</Tool Use>
 """
 
     id: str
@@ -144,8 +154,8 @@ the example used context:
         context_manager.add_context(
             key,
             f"""
-        task description: {self.task_description}
-        task response: {response}
+Task description: {self.task_description}
+Task response: {response}
         """,
         )
         self.execution_results.append(response)
@@ -469,6 +479,7 @@ class GraphPlanner(GenericPlanner):
         execute_history: list = None,
         knowledge: str = "",
         background: str = "",
+        categories: Optional[List[str]] = None,
         agent=None,
     ) -> List[Step]:
         """

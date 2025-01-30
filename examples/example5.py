@@ -14,10 +14,10 @@ from planners import GraphPlanner
 
 def main():
 
-    agent = Agent(model="gpt-4o-mini")
-    agent.planner = GraphPlanner(model="gpt-3.5-turbo")
+    agent = Agent()
+    agent.planner = GraphPlanner()
 
-    task = "3 steps draw a flower"
+    task = "3 steps draw a digital flower using computer charactors."
     agent.execute(task)
 
     execution_history = agent.execution_history
