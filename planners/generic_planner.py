@@ -53,13 +53,12 @@ class GenericPlanner:
     Each step may optionally specify a category, used for specialized validation.
     """
 
-    DEFAULT_PROMPT = """\
-The possible categories for each step are: {categories_str}, try to categorize step to one of these categories, if not, define new category and put in step_category.
-    
+    DEFAULT_PROMPT = """ 
 Given the following task and the possible tools, generate a plan based on provided knowledge by breaking it down into actionable steps.
 Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name', and 'step_category'.
 And if need to use the tool, please make sure 'step_description' should contain tool's properties needed information
 All steps should be encapsulated under the 'steps' key.
+The possible categories for each step are: {categories_str}, try to categorize step to one of these categories, if not, define new category and put in step_category.
 
 <Knowledge>
 {knowledge}

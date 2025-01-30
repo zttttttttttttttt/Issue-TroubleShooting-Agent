@@ -38,10 +38,10 @@ class ContextManager:
         """
         if not self.context:
             return ""
-        context_str = "<context>\n"
+        context_str = "<Context>\n"
         for key, value in self.context.items():
             context_str += f"<{key}>\n{value}\n</{key}>\n"
-        context_str += "</context>"
+        context_str += "</Context>"
         return context_str
 
     def __repr__(self):
