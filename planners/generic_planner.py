@@ -8,6 +8,7 @@ from langchain_core.tools import BaseTool
 from models.model_registry import ModelRegistry
 from utils.logger import get_logger
 from config import Config
+from .base_planner import BasePlanner
 
 
 class Step:
@@ -47,7 +48,7 @@ class Step:
         }
 
 
-class GenericPlanner:
+class GenericPlanner(BasePlanner):
     """
     A simple planner that calls the model to break a task into JSON steps.
     Each step may optionally specify a category, used for specialized validation.
@@ -119,7 +120,7 @@ Steps:
 }"""
 
     def __init__(
-        self, model: str = None, log_level: Optional[str] = None, prompt: str = None
+        self, model: str = None, log_level: Optional[str] = None
     ):
         """
         If 'model' is not provided, the default model from config will be used.
@@ -138,7 +139,7 @@ Steps:
             )
         self.logger.info(f"GenericPlanner initialized with model: {self.model.name}")
 
-        self._prompt = prompt or self.DEFAULT_PROMPT
+        self._prompt = self.DEFAULT_PROMPT
 
     @property
     def prompt(self) -> str:

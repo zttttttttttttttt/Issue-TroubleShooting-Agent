@@ -133,9 +133,8 @@ Summary:
 
     @planner.setter
     def planner(self, planner):
-        if not isinstance(planner, GenericPlanner) and not isinstance(
-            planner, GraphPlanner
-        ):
+        # We still allow either GenericPlanner or GraphPlanner, but now both inherit from BasePlanner.
+        if not isinstance(planner, (GenericPlanner, GraphPlanner)):
             self.logger.error(
                 "Planner must be an instance of GenericPlanner or GraphPlanner."
             )
@@ -234,22 +233,14 @@ Summary:
             agent=self,
         )
 
-        # Then call execute_plan on the planner
-        if isinstance(self._planner, GraphPlanner):
-            # Graph-based node execution
-            return self._planner.execute_plan(
-                execute_history=self._execution_history,
-                agent=self,
-            )
-        elif isinstance(self._planner, GenericPlanner):
-            # Step-based
-            return self._planner.execute_plan(
-                steps=steps,
-                execution_history=self._execution_history,
-                agent=self,
-                context_manager=self._context,
-                background=self.background,
-            )
+        # Now just call planner's execute_plan(...) in a unified way
+        return self._planner.execute_plan(
+            steps=steps,
+            execution_history=self._execution_history,
+            agent=self,
+            context_manager=self._context,
+            background=self.background,
+        )
 
     def get_execution_result_summary(self) -> str:
         """

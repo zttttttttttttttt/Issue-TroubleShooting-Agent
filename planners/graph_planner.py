@@ -6,10 +6,15 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 
 from langchain_core.tools import BaseTool
-from utils.logger import get_logger
+
+
 from validators import ScoreValidator
+from .base_planner import BasePlanner
+from .generic_planner import Step
+from models.model_registry import ModelRegistry
+from config import Config
+from utils.logger import get_logger
 from utils.context_manager import ContextManager
-from .generic_planner import GenericPlanner, Step
 
 
 @dataclass
@@ -20,15 +25,73 @@ class ExecutionResult:
 
 
 @dataclass
+class ReplanHistory:
+    history: List[Dict] = field(default_factory=list)
+
+    def add_record(self, record: Dict):
+        self.history.append(record)
+
+
+@dataclass
 class Node:
     """
     Represents a single node in the PlanGraph.
     """
 
-    logger = get_logger("graph-planner.node")  # minimal usage for node-level logs
+    id: str
+    task_description: str
+    next_nodes: List[str] = field(default_factory=list)
 
-    # Expose Node's default prompt for execution
-    DEFAULT_PROMPT = """
+    task_use_tool: bool = False
+    task_tool_name: str = ""
+    task_tool: BaseTool = None
+
+    execution_results: List[ExecutionResult] = field(default_factory=list)
+    validation_threshold: float = 0.8
+    max_attempts: int = 3
+    current_attempts: int = 0
+    failed_reasons: List[str] = field(default_factory=list)
+
+    task_category: str = "default"
+
+    def set_next_node(self, node: "Node"):
+        if node.id not in self.next_nodes:
+            self.next_nodes.append(node.id)
+
+
+@dataclass
+class PlanGraph:
+    """
+    Holds multiple Node objects in a directed structure.
+    Node-based plan execution with possible replan logic.
+    """
+
+    nodes: Dict[str, Node] = field(default_factory=dict)
+    start_node_id: Optional[str] = None
+    replan_history: ReplanHistory = field(default_factory=ReplanHistory)
+    current_node_id: Optional[str] = None
+
+    def add_node(self, node: Node):
+        self.nodes[node.id] = node
+        if self.start_node_id is None:
+            self.start_node_id = node.id
+
+    def summarize_plan(self) -> str:
+        summary = ""
+        for n in self.nodes.values():
+            summary += f"Node {n.id}: {n.task_description}, Next: {n.next_nodes}\n"
+        return summary
+
+
+class GraphPlanner(BasePlanner):
+    """
+    A planner that builds a PlanGraph, uses context, and executes node-based logic with re-planning.
+    Inherits from BasePlanner instead of GenericPlanner.
+    """
+
+    logger = get_logger("graph-planner.node")
+
+    DEFAULT_EXECUTE_PROMPT = """
 
 <Background>
 {background}
@@ -68,78 +131,7 @@ the example used context:
 </Tool Use>
 """
 
-    id: str
-    task_description: str
-    next_nodes: List[str] = field(default_factory=list)
-
-    task_use_tool: bool = False
-    task_tool_name: str = ""
-    task_tool: BaseTool = None
-
-    execution_results: List[ExecutionResult] = field(default_factory=list)
-    validation_threshold: float = 0.8
-    max_attempts: int = 3
-    current_attempts: int = 0
-    failed_reasons: List[str] = field(default_factory=list)
-
-    task_category: str = "default"
-
-    # Store the node's prompt in an instance variable, defaulting to DEFAULT_PROMPT
-    _prompt: str = field(default=DEFAULT_PROMPT, init=False)
-
-    @property
-    def prompt(self) -> str:
-        return self._prompt
-
-    @prompt.setter
-    def prompt(self, value: str):
-        self._prompt = value
-
-    def should_replan(self) -> bool:
-        if not self.execution_results:
-            return False
-        # The last item in execution_results might be a str or an ExecutionResult
-        last_entry = self.execution_results[-1]
-        if isinstance(last_entry, ExecutionResult):
-            last_score = last_entry.validation_score
-        else:
-            # If it's a raw string, no numeric score is available
-            return False
-
-        if last_score >= self.validation_threshold:
-            return False
-        elif self.current_attempts >= self.max_attempts:
-            failure_reason = (
-                f"Failed to reach threshold after {self.max_attempts} attempts."
-            )
-            self.failed_reasons.append(failure_reason)
-            return True
-        return False
-
-    def set_next_node(self, node: "Node"):
-        if node.id not in self.next_nodes:
-            self.next_nodes.append(node.id)
-
-
-@dataclass
-class ReplanHistory:
-    history: List[Dict] = field(default_factory=list)
-
-    def add_record(self, record: Dict):
-        self.history.append(record)
-
-
-@dataclass
-class PlanGraph:
-    """
-    Holds multiple Node objects in a directed structure.
-    Executes them in order, and triggers replan logic if needed.
-    """
-
-    logger = get_logger("graph-planner")
-
-    # The PlanGraph has one main replan prompt
-    DEFAULT_PROMPT = """\
+    DEFAULT_REPLAN_PROMPT = """\
 {context_str}
 
 Below is the current plan and its execution state:
@@ -161,62 +153,53 @@ Instructions:
 - Return valid JSON with keys: "action", "new_subtasks", "restart_node_id", "modifications", "rationale".
 """
 
-    nodes: Dict[str, Node] = field(default_factory=dict)
-    start_node_id: Optional[str] = None
-    replan_history: ReplanHistory = field(default_factory=ReplanHistory)
-    current_node_id: Optional[str] = None
-
-    # We'll store the replan prompt in an instance variable
-    _prompt: str = field(default=DEFAULT_PROMPT, init=False)
-
-    @property
-    def prompt(self) -> str:
-        """Prompt for replan instructions in call_llm_for_replan."""
-        return self._prompt
-
-    @prompt.setter
-    def prompt(self, value: str):
-        self._prompt = value
-
-    def add_node(self, node: Node):
-        self.nodes[node.id] = node
-        if self.start_node_id is None:
-            self.start_node_id = node.id
-
-    def summarize_plan(self) -> str:
-        summary = ""
-        for n in self.nodes.values():
-            summary += f"Node {n.id}: {n.task_description}, Next: {n.next_nodes}\n"
-        return summary
-
-
-class GraphPlanner(GenericPlanner):
-    """
-    Extends GenericPlanner but builds a PlanGraph, uses context, and
-    executes node-based logic with re-planning.
-    """
-
     def __init__(
         self,
         model: str = None,
         log_level: Optional[str] = None,
-        prompt: str = None,
-        node_prompt: str = None,
-        replan_prompt: str = None,
     ):
         """
-        :param prompt:       Override for the base planning prompt inherited from GenericPlanner.
+        :param prompt:       Not specifically used in GraphPlanner's node-based approach, but included for interface consistency.
         :param node_prompt:  Override for Node execution prompt.
         :param replan_prompt:Override for PlanGraph's replan prompt.
         """
-        super().__init__(model=model, log_level=log_level, prompt=prompt)
         self.logger = get_logger("graph-planner", log_level)
+
+        if not model:
+            model = Config.DEFAULT_MODEL
+        self.model_name = model
+        self.model = ModelRegistry.get_model(self.model_name)
+        if not self.model:
+            self.logger.error(f"Model '{self.model_name}' not found for planning.")
+            raise ValueError(
+                f"Model '{self.model_name}' is not supported for planning."
+            )
+        self.logger.info(f"GraphPlanner initialized with model: {self.model.name}")
+
         self.plan_graph: Optional[PlanGraph] = None
         self.context_manager = ContextManager()
         self._background = ""  # We'll store background for node execution
 
-        self._node_prompt = node_prompt
-        self._replan_prompt = replan_prompt
+        self._replan_prompt = self.DEFAULT_REPLAN_PROMPT
+        self._execute_prompt = self.DEFAULT_EXECUTE_PROMPT
+
+    @property
+    def replan_prompt(self) -> str:
+        """Prompt for replan instructions in call_llm_for_replan."""
+        return self._replan_prompt
+
+    @replan_prompt.setter
+    def replan_prompt(self, value: str):
+        self._replan_prompt = value
+
+    @property
+    def execute_prompt(self) -> str:
+        """Prompt for node prompt"""
+        return self._execute_prompt
+
+    @execute_prompt.setter
+    def execute_prompt(self, value: str):
+        self._execute_prompt = value
 
     def plan(
         self,
@@ -229,20 +212,71 @@ class GraphPlanner(GenericPlanner):
         agent=None,
     ) -> List[Step]:
         """
-        1) Use the base class to get Steps, guided by `knowledge`.
-        2) Convert them into a PlanGraph.
-        3) Store `background` for later usage when executing nodes.
-        4) Return Steps (for reference).
+        1) Similar to GenericPlanner, generate steps (just to keep consistent).
+        2) Convert them into a PlanGraph with Node objects.
         """
-        steps = super().plan(
-            task, tools, execute_history, knowledge, background, categories, agent
-        )
-        self._background = background  # Save background for node execution
+        self.logger.info(f"GraphPlanner: Creating plan for task: {task}")
+        # For simplicity, re-use the logic from a quick "Step" generation approach:
+        # We'll just do a minimal prompt to create steps, or a simplified approach:
+        steps = []
+        if agent and hasattr(agent, "llm_chat"):
+            # A minimal example: We'll ask the model to create steps in JSON:
+            # Or you can replicate the same code from GenericPlanner if you want to keep it consistent
+            # Minimally, we just assume a single step if we want to do less logic
+            # But let's do something consistent with categories, etc.
+            # For minimal changes, we can do a short approach or replicate logic from GenericPlanner.
+            # We'll replicate a small portion:
 
+            categories_str = ", ".join(categories) if categories else "default"
+            plan_prompt = f"""Create a short plan in JSON with a single step for task: "{task}".
+Categories: {categories_str}
+Return format:
+{{
+  "steps": [
+    {{
+       "step_name": "Example step",
+       "step_description": "Do something",
+       "use_tool": false,
+       "tool_name": "",
+       "step_category": "default"
+    }}
+  ]
+}}
+"""
+            raw_response = self.model.process(plan_prompt)
+            try:
+                data = json.loads(raw_response)
+                steps_data = data.get("steps", [])
+                for sd in steps_data:
+                    st_name = sd.get("step_name")
+                    st_desc = sd.get("step_description")
+                    st_use_tool = sd.get("use_tool", False)
+                    st_tool_name = sd.get("tool_name", "")
+                    st_cat = sd.get("step_category", "default")
+                    if st_name and st_desc:
+                        steps.append(
+                            Step(
+                                name=st_name,
+                                description=st_desc,
+                                use_tool=st_use_tool,
+                                tool_name=st_tool_name,
+                                category=st_cat,
+                            )
+                        )
+            except json.JSONDecodeError:
+                self.logger.warning(
+                    "Could not parse plan. Creating a default single step."
+                )
+                steps = [Step("NodeA", task, False, "", "default")]
+        else:
+            # fallback
+            steps = [Step("NodeA", task, False, "", "default")]
+
+        self._background = background  # Save background
+
+        # Build the PlanGraph
         plan_graph = PlanGraph()
-        # If user gave a custom replan prompt, override PlanGraph's prompt
-        if self._replan_prompt:
-            plan_graph.prompt = self._replan_prompt
+        plan_graph.prompt = self._replan_prompt
 
         previous_node = None
         tool_map = {}
@@ -265,8 +299,8 @@ class GraphPlanner(GenericPlanner):
                 task_category=step.category,  # tie the step's category to the node
             )
             # If user gave a custom node prompt, override
-            if self._node_prompt:
-                node.prompt = self._node_prompt
+            # if self._execute_prompt:
+            #     node.prompt = self._execute_prompt
 
             plan_graph.add_node(node)
 
@@ -279,16 +313,24 @@ class GraphPlanner(GenericPlanner):
 
     def execute_plan(
         self,
-        execute_history: list,
+        steps: List[Step],
+        execution_history: list,
         agent=None,
+        context_manager=None,
+        background: str = "",
     ):
         """
-        Executes each node in sequence from plan_graph.
-        If a node fails validation, attempt replan or re-try.
+        Executes the PlanGraph node by node.
+        'steps' is ignored in practice, because we use self.plan_graph.
+        This signature is here for consistency with the BasePlanner interface.
         """
         if not self.plan_graph:
             self.logger.error("No plan_graph found. Did you call plan() first?")
             return
+
+        self._background = background
+        if context_manager:
+            self.context_manager = context_manager
 
         pg = self.plan_graph
         pg.current_node_id = pg.current_node_id or pg.start_node_id
@@ -306,7 +348,7 @@ class GraphPlanner(GenericPlanner):
 
             if score >= node.validation_threshold:
                 node.result = result
-                execute_history.append(
+                execution_history.append(
                     {
                         "step_name": node.id,
                         "step_description": node.task_description,
@@ -320,7 +362,7 @@ class GraphPlanner(GenericPlanner):
                     self.logger.info("Plan execution completed successfully.")
                     break
             else:
-                if node.should_replan():
+                if self._should_replan(node):
                     self.logger.warning(f"Replanning needed at Node {node.id}")
                     failure_info = self.prepare_failure_info(node)
                     replan_response = self.call_llm_for_replan(pg, failure_info)
@@ -358,9 +400,6 @@ class GraphPlanner(GenericPlanner):
 
         return "Task execution completed using GraphPlanner."
 
-    #
-    # The node-level methods, previously in Node
-    #
     def _execute_node(self, node: Node) -> str:
         """
         Build prompt + call the LLM. If 'use_tool', invoke the tool.
@@ -383,7 +422,9 @@ class GraphPlanner(GenericPlanner):
                 tool_description = f"[Tool: {node.task_tool_name}]"
 
         final_prompt = node.prompt.format(
-            context=self.context_manager.context_to_str(),
+            context=(
+                self.context_manager.context_to_str() if self.context_manager else ""
+            ),
             background=self._background,
             task_description=node.task_description,
             task_use_tool=node.task_use_tool,
@@ -411,13 +452,14 @@ class GraphPlanner(GenericPlanner):
 
         # Add node info to context
         key = f"Node-{node.id}"
-        self.context_manager.add_context(
-            key,
-            f"""
+        if self.context_manager:
+            self.context_manager.add_context(
+                key,
+                f"""
 Task description: {node.task_description}
 Task response: {response}
-        """,
-        )
+            """,
+            )
         # Keep the raw response in node's execution_results for reference
         node.execution_results.append(response)
         print(response)
@@ -462,9 +504,29 @@ Task response: {response}
         node.execution_results.append(execution_result)
         return numeric_score
 
-    #
-    # Replan-related helpers
-    #
+    def _should_replan(self, node: Node) -> bool:
+        """
+        Moved from Node.should_replan().
+        Checks if the node's last result is below threshold and attempts are exceeded.
+        """
+        if not node.execution_results:
+            return False
+        last_entry = node.execution_results[-1]
+        if isinstance(last_entry, ExecutionResult):
+            last_score = last_entry.validation_score
+        else:
+            return False
+
+        if last_score >= node.validation_threshold:
+            return False
+        elif node.current_attempts >= node.max_attempts:
+            failure_reason = (
+                f"Failed to reach threshold after {node.max_attempts} attempts."
+            )
+            node.failed_reasons.append(failure_reason)
+            return True
+        return False
+
     def prepare_failure_info(self, node: Node) -> Dict:
         """
         Produce the context for replan prompt.
@@ -489,7 +551,9 @@ Task response: {response}
 
     def call_llm_for_replan(self, plan_graph: PlanGraph, failure_info: Dict) -> str:
         plan_summary = plan_graph.summarize_plan()
-        context_str = self.context_manager.context_to_str()
+        context_str = (
+            self.context_manager.context_to_str() if self.context_manager else ""
+        )
 
         final_prompt = plan_graph.prompt.format(
             context_str=context_str,
@@ -566,7 +630,10 @@ def parse_llm_response(llm_response: str) -> Optional[str]:
 
 
 def apply_adjustments_to_plan(
-    plan_graph, node_id: str, adjustments_str: str, nodes_dict: Dict[str, "Node"]
+    plan_graph: PlanGraph,
+    node_id: str,
+    adjustments_str: str,
+    nodes_dict: Dict[str, Node],
 ):
     adjustments = json.loads(adjustments_str)
     action = adjustments.get("action")
