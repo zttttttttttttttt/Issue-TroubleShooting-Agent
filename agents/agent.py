@@ -198,10 +198,7 @@ Summary:
     def execute(self, task: str):
         """
         1) If no planner, do direct single-step with the model (use background).
-        2) If planner is GenericPlanner, run step-by-step (use background) + record each step.
-           *Now includes optional validation if validators_enabled.*
-        3) If planner is GraphPlanner, .plan(task) automatically runs node-based planning
-           (using knowledge for plan generation and background for node execution).
+        2) If planner, plan(...) -> then call execute_plan(...).
         """
         self.logger.info(f"Agent is executing task: {task}")
 
@@ -225,11 +222,8 @@ Summary:
             )
             return response
 
-        # Case 2: Using a planner => pass knowledge to the plan
-
-        # If we have a planner, pass the current list of categories
+        # Case 2: Using a planner => first create steps/graph
         current_categories = list(self._validators.keys())
-
         steps = self._planner.plan(
             task,
             self.tools,
@@ -240,64 +234,22 @@ Summary:
             agent=self,
         )
 
-        # If the planner is GraphPlanner, .plan() already calls execute_plan() internally.
-        # So we do NOT do the step-based for-loop here.
+        # Then call execute_plan on the planner
         if isinstance(self._planner, GraphPlanner):
-            # Return after the graph-based plan is done
-            return "Task execution completed using GraphPlanner."
-
-        # Otherwise, it's a GenericPlanner => do step-based execution
-        if isinstance(self._planner, GenericPlanner):
-            # (Note: If it's a GraphPlanner subclassing GenericPlanner, you'd hit the above if-check first.)
-            self.logger.info(f"Executing plan with {len(steps)} steps.")
-            for idx, step in enumerate(steps, 1):
-                if self._execution_history:
-                    self._context.add_context(
-                        "Execution History",
-                        execution_history_to_str(self._execution_history),
-                    )
-                context_section = self._context.context_to_str()
-                # Possibly incorporate the context in the step prompt
-                final_prompt = self._execute_prompt.format(
-                    context_section=context_section,
-                    background=background_format(self.background),
-                    task=step.description,
-                )
-                self.logger.info(f"Executing Step {idx}: {step.description}")
-                response = self._model.process(final_prompt)
-                self.logger.info(f"Response for Step {idx}: {response}")
-
-                # Optional validation
-                if self.validators_enabled:
-                    # If the step's category isn't in our mapping, fallback to "default"
-                    chosen_cat = (
-                        step.category
-                        if step.category in self._validators
-                        else "default"
-                    )
-                    validator = self._validators.get(chosen_cat)
-                    if validator:
-                        decision, score, details = validator.validate(
-                            step.description, response
-                        )
-                        self.logger.info(
-                            f"Validator Decision: {decision}, Score: {score}"
-                        )
-                        # Additional logic could be added here if decision == "Rerun Subtask"
-                    else:
-                        self.logger.warning(
-                            f"No validator found even for 'default' category. Skipping validation."
-                        )
-
-                # Record the step execution
-                self._execution_history.append(
-                    {
-                        "step_name": step.name,
-                        "step_description": step.description,
-                        "step_result": str(response),
-                    }
-                )
-            return "Task execution completed using GenericPlanner."
+            # Graph-based node execution
+            return self._planner.execute_plan(
+                execute_history=self._execution_history,
+                agent=self,
+            )
+        elif isinstance(self._planner, GenericPlanner):
+            # Step-based
+            return self._planner.execute_plan(
+                steps=steps,
+                execution_history=self._execution_history,
+                agent=self,
+                context_manager=self._context,
+                background=self.background,
+            )
 
     def get_execution_result_summary(self) -> str:
         """
@@ -334,7 +286,6 @@ def execution_history_to_str(execution_history: list):
 
 
 def background_format(background: str):
-
     background_str = ""
     if background != "":
         background_str = "<Background>\n"

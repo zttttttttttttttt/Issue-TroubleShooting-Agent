@@ -272,3 +272,77 @@ Steps:
         except Exception as e:
             self.logger.error(f"Unexpected error during parsing steps: {e}")
             raise
+
+    def execute_plan(
+        self,
+        steps: List[Step],
+        execution_history: list,
+        agent=None,
+        context_manager=None,
+        background: str = "",
+    ):
+        """
+        Execute a list of steps (previously planned).
+        This replaces the step-by-step logic that was inside agent.py for GenericPlanner.
+        """
+        self.logger.info(f"Executing plan with {len(steps)} steps.")
+
+        for idx, step in enumerate(steps, 1):
+            # Possibly incorporate the context in the step prompt
+            if execution_history and context_manager:
+                from agents.agent import execution_history_to_str
+
+                context_manager.add_context(
+                    "Execution History",
+                    execution_history_to_str(execution_history),
+                )
+            context_section = (
+                context_manager.context_to_str() if context_manager else ""
+            )
+            final_prompt = (
+                f"{context_section}"
+                f"{background_format(background)}"
+                f"<Task>\n"
+                f"{step.description}\n"
+                f"</Task>\n"
+            )
+
+            self.logger.info(f"Executing Step {idx}: {step.description}")
+            response = self.model.process(final_prompt)
+            self.logger.info(f"Response for Step {idx}: {response}")
+
+            # Optional validation
+            if agent and agent.validators_enabled:
+                chosen_cat = (
+                    step.category if step.category in agent.validators else "default"
+                )
+                validator = agent.validators.get(chosen_cat)
+                if validator:
+                    decision, score, details = validator.validate(
+                        step.description, response
+                    )
+                    self.logger.info(f"Validator Decision: {decision}, Score: {score}")
+                else:
+                    self.logger.warning(
+                        f"No validator found even for 'default' category. Skipping validation."
+                    )
+
+            # Record the step execution
+            execution_history.append(
+                {
+                    "step_name": step.name,
+                    "step_description": step.description,
+                    "step_result": str(response),
+                }
+            )
+
+        return "Task execution completed using GenericPlanner."
+
+
+def background_format(background: str):
+    background_str = ""
+    if background != "":
+        background_str = "<Background>\n"
+        background_str += f"{background}\n"
+        background_str += "</Background>\n"
+    return background_str
