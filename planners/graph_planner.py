@@ -7,10 +7,9 @@ from typing import List, Dict, Optional
 
 from langchain_core.tools import BaseTool
 
-
 from validators import ScoreValidator
 from .base_planner import BasePlanner
-from .generic_planner import Step
+from .generic_planner import GenericPlanner, Step
 from models.model_registry import ModelRegistry
 from config import Config
 from utils.logger import get_logger
@@ -158,11 +157,6 @@ Instructions:
         model: str = None,
         log_level: Optional[str] = None,
     ):
-        """
-        :param prompt:       Not specifically used in GraphPlanner's node-based approach, but included for interface consistency.
-        :param node_prompt:  Override for Node execution prompt.
-        :param replan_prompt:Override for PlanGraph's replan prompt.
-        """
         self.logger = get_logger("graph-planner", log_level)
 
         if not model:
@@ -212,71 +206,29 @@ Instructions:
         agent=None,
     ) -> List[Step]:
         """
-        1) Similar to GenericPlanner, generate steps (just to keep consistent).
-        2) Convert them into a PlanGraph with Node objects.
+        1) Call GenericPlanner to obtain a list of Steps using the same arguments.
+        2) Convert those Steps into a PlanGraph with Node objects.
+        3) Return the same Steps (for reference), but we'll actually execute nodes later.
         """
         self.logger.info(f"GraphPlanner: Creating plan for task: {task}")
-        # For simplicity, re-use the logic from a quick "Step" generation approach:
-        # We'll just do a minimal prompt to create steps, or a simplified approach:
-        steps = []
-        if agent and hasattr(agent, "llm_chat"):
-            # A minimal example: We'll ask the model to create steps in JSON:
-            # Or you can replicate the same code from GenericPlanner if you want to keep it consistent
-            # Minimally, we just assume a single step if we want to do less logic
-            # But let's do something consistent with categories, etc.
-            # For minimal changes, we can do a short approach or replicate logic from GenericPlanner.
-            # We'll replicate a small portion:
 
-            categories_str = ", ".join(categories) if categories else "default"
-            plan_prompt = f"""Create a short plan in JSON with a single step for task: "{task}".
-Categories: {categories_str}
-Return format:
-{{
-  "steps": [
-    {{
-       "step_name": "Example step",
-       "step_description": "Do something",
-       "use_tool": false,
-       "tool_name": "",
-       "step_category": "default"
-    }}
-  ]
-}}
-"""
-            raw_response = self.model.process(plan_prompt)
-            try:
-                data = json.loads(raw_response)
-                steps_data = data.get("steps", [])
-                for sd in steps_data:
-                    st_name = sd.get("step_name")
-                    st_desc = sd.get("step_description")
-                    st_use_tool = sd.get("use_tool", False)
-                    st_tool_name = sd.get("tool_name", "")
-                    st_cat = sd.get("step_category", "default")
-                    if st_name and st_desc:
-                        steps.append(
-                            Step(
-                                name=st_name,
-                                description=st_desc,
-                                use_tool=st_use_tool,
-                                tool_name=st_tool_name,
-                                category=st_cat,
-                            )
-                        )
-            except json.JSONDecodeError:
-                self.logger.warning(
-                    "Could not parse plan. Creating a default single step."
-                )
-                steps = [Step("NodeA", task, False, "", "default")]
-        else:
-            # fallback
-            steps = [Step("NodeA", task, False, "", "default")]
+        # Use GenericPlanner internally to get the steps
+        generic_planner = GenericPlanner(model=self.model_name, log_level=None)
+        steps = generic_planner.plan(
+            task=task,
+            tools=tools,
+            execute_history=execute_history,
+            knowledge=knowledge,
+            background=background,
+            categories=categories,
+            agent=agent,
+        )
 
-        self._background = background  # Save background
-
-        # Build the PlanGraph
+        # Convert Steps -> Node objects in a new PlanGraph
+        self._background = background
         plan_graph = PlanGraph()
-        plan_graph.prompt = self._replan_prompt
+
+        plan_graph.prompt = self._replan_prompt  # If needed for replan calls
 
         previous_node = None
         tool_map = {}
@@ -284,7 +236,7 @@ Return format:
             tool_map = {tool.name: tool for tool in tools}
 
         for idx, step in enumerate(steps, start=1):
-            node_id = chr(65 + idx - 1)  # A, B, C, ...
+            node_id = chr(65 + idx - 1)  # e.g., A, B, C...
             next_node_id = chr(65 + idx) if idx < len(steps) else ""
 
             node = Node(
@@ -296,12 +248,8 @@ Return format:
                 next_nodes=[next_node_id] if next_node_id else [],
                 validation_threshold=0.8,
                 max_attempts=3,
-                task_category=step.category,  # tie the step's category to the node
+                task_category=step.category,
             )
-            # If user gave a custom node prompt, override
-            # if self._execute_prompt:
-            #     node.prompt = self._execute_prompt
-
             plan_graph.add_node(node)
 
             if previous_node:
@@ -421,7 +369,8 @@ Return format:
                 )
                 tool_description = f"[Tool: {node.task_tool_name}]"
 
-        final_prompt = node.prompt.format(
+        # Node doesn't store a custom prompt, so we use self._execute_prompt
+        final_prompt = self._execute_prompt.format(
             context=(
                 self.context_manager.context_to_str() if self.context_manager else ""
             ),
@@ -506,7 +455,6 @@ Task response: {response}
 
     def _should_replan(self, node: Node) -> bool:
         """
-        Moved from Node.should_replan().
         Checks if the node's last result is below threshold and attempts are exceeded.
         """
         if not node.execution_results:
