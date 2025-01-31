@@ -65,6 +65,8 @@ class PlanGraph:
     Node-based plan execution with possible replan logic.
     """
 
+    logger = get_logger("plan-graph")
+
     nodes: Dict[str, Node] = field(default_factory=dict)
     start_node_id: Optional[str] = None
     replan_history: ReplanHistory = field(default_factory=ReplanHistory)
@@ -87,8 +89,6 @@ class GraphPlanner(BasePlanner):
     A planner that builds a PlanGraph, uses context, and executes node-based logic with re-planning.
     Inherits from BasePlanner instead of GenericPlanner.
     """
-
-    logger = get_logger("graph-planner.node")
 
     DEFAULT_EXECUTE_PROMPT = """
 
@@ -130,12 +130,10 @@ the example used context:
 </Tool Use>
 """
 
-    DEFAULT_REPLAN_PROMPT = """\
-{context_str}
+    DEFAULT_REPLAN_PROMPT = """
+You are an intelligent assistant helping to adjust a task execution plan represented as a graph of subtasks. Below are the details:
 
-Below is the current plan and its execution state:
-
-**Plan Summary:**
+**Current Plan:**
 {plan_summary}
 
 **Execution History:**
@@ -147,9 +145,40 @@ Below is the current plan and its execution state:
 **Replanning History:**
 {replan_history}
 
-Instructions:
-- Decide if we do a "breakdown" or "replan".
-- Return valid JSON with keys: "action", "new_subtasks", "restart_node_id", "modifications", "rationale".
+**Instructions:**
+- Analyze the failure and decide on one of two actions:
+    1. **breakdown**: Break down the failed task into smaller subtasks.
+    2. **replan**: Go back to a previous node for replanning.
+- If you choose **breakdown**, provide detailed descriptions of the new subtasks.
+- If you choose **replan**, specify which node to return to and suggest any modifications to the plan after that node.
+- Return your response in the following JSON format (do not include any additional text):
+
+```json
+{{
+    "action": "breakdown" or "replan",
+    "new_subtasks": [  // Required if action is "breakdown"
+        {{
+            "id": "unique_task_id",
+            "task_description": "Description of the subtask",
+            "next_nodes": ["next_node_id_1", "next_node_id_2"],
+            "validation_threshold": 0.8,
+            "max_attempts": 3
+        }}
+    ],
+    "restart_node_id": "node_id",  // Required if action is "replan"
+    "modifications": [  // Optional, used if action is "replan"
+        {{
+            "node_id": "node_to_modify_id",
+            "task_description": "Modified description",
+            "next_nodes": ["next_node_id_1", "next_node_id_2"],
+            "validation_threshold": 0.8,
+            "max_attempts": 3
+        }}
+    ],
+    "rationale": "Explanation of your reasoning here"
+}}
+
+**Note:** Ensure your response is valid JSON, without any additional text or comments.
 """
 
     def __init__(
@@ -344,6 +373,11 @@ Instructions:
                 else:
                     # Retry the same node
                     self.logger.warning(f"Retrying Node {node.id}")
+                    # remove node info from context
+                    key = f"Node-{node.id}"
+                    if self.context_manager:
+                        self.context_manager.remove_context(key)
+
                     continue
 
         return "Task execution completed using GraphPlanner."
@@ -352,7 +386,7 @@ Instructions:
         """
         Build prompt + call the LLM. If 'use_tool', invoke the tool.
         """
-        print(f"Executing Node {node.id}: {node.task_description}")
+        self.logger.info(f"Executing Node {node.id}: {node.task_description}")
         node.current_attempts += 1
 
         tool_description = ""
@@ -411,7 +445,7 @@ Task response: {response}
             )
         # Keep the raw response in node's execution_results for reference
         node.execution_results.append(response)
-        print(response)
+        self.logger.info(f"Response: {response}")
         return response
 
     def _validate_node(self, node: Node, result: str, agent) -> float:
@@ -442,10 +476,11 @@ Task response: {response}
             return 1.0
 
         decision, score, details = validator.validate(node.task_description, result)
-        if decision == "Rerun Subtask":
-            numeric_score = 0.0
-        else:
-            numeric_score = float(score) / 40.0
+        numeric_score = float(score) / 40.0
+        # if decision == "Rerun Subtask":
+        #     numeric_score = 0.0
+        # else:
+        #     numeric_score = float(score) / 40.0
 
         execution_result = ExecutionResult(
             output=result, validation_score=numeric_score, timestamp=datetime.now()
@@ -511,9 +546,9 @@ Task response: {response}
             replan_history=failure_info["replan_history"],
         )
 
-        print("Calling model for replan instructions...")
+        self.logger.info("Calling model for replan instructions...")
         response = self.model.process(final_prompt)
-        print("Replan response:", response)
+        self.logger.info(f"Replan response: {response}")
         return response
 
     def determine_restart_node(self, llm_response: str) -> Optional[str]:
@@ -528,22 +563,24 @@ Task response: {response}
                     (st.get("id") for st in new_subtasks if "id" in st), None
                 )
                 if not restart_node_id:
-                    print(
+                    self.logger.warning(
                         "No valid 'id' found in new_subtasks, cannot restart. Aborting."
                     )
                     return None
             else:
-                print("No subtasks found for breakdown action. Aborting execution.")
+                self.logger.warning(
+                    "No subtasks found for breakdown action. Aborting execution."
+                )
                 return None
         else:
-            print("Unknown action. Aborting execution.")
+            self.logger.warning("Unknown action. Aborting execution.")
             return None
 
         if restart_node_id and restart_node_id in self.plan_graph.nodes:
             return restart_node_id
         else:
             if restart_node_id:
-                print(
+                self.logger.warning(
                     f"Restart node '{restart_node_id}' does not exist. Aborting execution."
                 )
             return None
