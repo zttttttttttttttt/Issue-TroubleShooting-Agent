@@ -1,7 +1,12 @@
 # utils/context_manager.py
 
+from utils.logger import get_logger
+
 
 class ContextManager:
+
+    logger = get_logger("contect manager")
+
     def __init__(self):
         self.context = {}
 
@@ -22,14 +27,14 @@ class ContextManager:
 
     def add_context(self, key, value):
         self.context[key] = value
-        print(f"Add '{key}' into the context.")
+        self.logger.info(f"Add '{key}' into the context.")
 
     def remove_context(self, key):
         if key in self.context:
             del self.context[key]
-            print(f"Remove '{key}' from the context.")
+            self.logger.info(f"Remove '{key}' from the context.")
         else:
-            print(f"Key '{key}' not found in context.")
+            self.logger.info(f"Key '{key}' not found in context.")
 
     def context_to_str(self):
         """
