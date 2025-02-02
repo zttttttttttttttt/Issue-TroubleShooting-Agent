@@ -1,6 +1,8 @@
 # utils/llm_chat.py
 
 import re
+import json
+from typing import Optional
 from models.model_registry import ModelRegistry
 from config.config import Config
 from utils.logger import get_logger
@@ -121,3 +123,13 @@ Now, produce your evaluation:
         if match:
             return match.group(1).strip()
         return f"No {label} found."
+
+    def parse_llm_response(self, llm_response: str) -> Optional[str]:
+        try:
+            cleaned = llm_response.replace("```json", "").replace("```", "").strip()
+            llm_response_json = json.loads(cleaned)
+            return llm_response_json
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse JSON: {e}")
+            self.logger.error(f"Raw LLM response was: {cleaned}")
+            return None

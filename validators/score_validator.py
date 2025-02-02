@@ -50,7 +50,7 @@ At the end:
         self,
         model: Optional[str] = None,
         log_level: Optional[str] = None,
-        prompt: str = None,
+        validation_threshold: Optional[float] = 0.9,
     ):
         """
         Pass in the agent's model instance so we can call model.process(...) for validation prompts.
@@ -63,8 +63,8 @@ At the end:
             model = Config.DEFAULT_MODEL
 
         self.model = model
-        
-        self._prompt = prompt or self.DEFAULT_PROMPT
+        self.validation_threshold = validation_threshold
+        self._prompt = self.DEFAULT_PROMPT
 
     @property
     def prompt(self) -> str:
@@ -109,7 +109,10 @@ At the end:
                 r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\(Score:? (\d+)\)\*\*", line
             )
             match_4 = re.match(r"\d+\.\s+\*\*([A-Za-z\s]+)\*\* \(Score (\d+)\):", line)
-            match = match_1 or match_2 or match_3 or match_4
+            match_5 = re.match(r"\*\*([A-Za-z\s]+)\s*\(Score\s1-5\):\s*(\d+)\*\*", line)
+            match_6 = re.match(r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\(Score\s1-5\):\*\*\s*(\d+)", line)
+            match_7 = re.match(r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\(Score\s1-5\):\s*(\d+)\*\*", line)
+            match = match_1 or match_2 or match_3 or match_4 or match_5 or match_6 or match_7
 
             if match:
                 criterion = match.group(1).strip()
@@ -121,7 +124,7 @@ At the end:
         any_low_scores = any(score < 3 for _, score in scores)
 
         # Final decision logic
-        if total_score > 35 and not any_low_scores:
+        if float(total_score) / 40.0 > self.validation_threshold and not any_low_scores:
             decision = "Accept Output"
         else:
             decision = "Rerun Subtask"

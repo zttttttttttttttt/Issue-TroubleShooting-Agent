@@ -17,7 +17,7 @@ def main():
     agent = Agent()
     agent.planner = GraphPlanner()
 
-    task = "3 steps draw a digital flower using computer charactors."
+    task = "3 steps draw a digital dragon using computer emoji characters."
     agent.execute(task)
 
     execution_history = agent.execution_history
