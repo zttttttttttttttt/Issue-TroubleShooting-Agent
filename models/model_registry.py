@@ -9,7 +9,6 @@ import logging
 from config.config import load_config
 from .base_model import BaseModel  # Updated import
 from utils.logger import get_logger
-from config.config import Config
 
 
 def load_models_dynamically(logger):    
