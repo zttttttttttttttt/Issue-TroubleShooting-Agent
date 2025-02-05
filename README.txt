@@ -37,7 +37,14 @@ PhAENix seamlessly integrates the mythical rebirth of the Phoenix with the LLM A
 git clone https://github.com/lukewu8023/agent-core.git
 ```
 
-#### 2. Create you own agent repository
+#### 2.a Clone the examples repository 
+
+```bash
+git clone https://github.com/lukewu8023/agent-examples.git
+cd agent-examples
+```
+
+#### 2.b Create you own agent repository 
 
 ```bash
 mkdir x-agent
@@ -52,7 +59,7 @@ source venv/bin/activate  # Linux/Mac
 venv\Scripts\activate     # Windows
 ```
 
-#### 3. Install the project as a library
+#### 4. Install the project as a library
 
 You can install by referencing the directory:
 
