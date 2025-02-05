@@ -7,7 +7,7 @@ load_dotenv()
 
 class Config:
 
-    api_base: str = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
+    api_base: str = os.environ.get("OPENAI_API_BASE", "")
     api_key: str = os.environ.get("OPENAI_API_KEY","")
 
     # Default log level (turn off informational logs by default)
