@@ -1,5 +1,8 @@
 from setuptools import setup, find_packages
 
+with open("requirements.txt") as f:
+    requirements = f.read().splitlines()
+
 setup(
     name="agent-core",  # Package name
     version="0.1.0",  # Package version
@@ -10,9 +13,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/lukewu8023/agent-core",
     packages=find_packages(),  # Automatically find subpackages
-    install_requires=[
-        # List dependencies, e.g. "numpy>=1.21.0"
-    ],
+    install_requires=requirements,
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
