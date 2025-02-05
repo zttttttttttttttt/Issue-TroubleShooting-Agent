@@ -152,6 +152,15 @@ Summary:
         """
         return self._execution_history
 
+    @property
+    def execution_responses(self) -> str:
+        """
+        Read-only access to the execution responses.
+        Combine all 'step_result' together.
+        """
+        responses_text = execution_history_to_responses(self._execution_history)
+        return responses_text
+
     def _load_default_validators(self):
         """
         Load a default mapping of category -> validator (all referencing the current model).
@@ -274,6 +283,16 @@ def execution_history_to_str(execution_history: list):
 
     history_text = "\n".join(history_lines)
     return history_text
+
+
+def execution_history_to_responses(execution_history: list):
+    response_lines = []
+    for idx, record in enumerate(execution_history, 1):
+        line = f"{record['step_result']}\n"
+        response_lines.append(line)
+
+    responses_text = "\n".join(response_lines)
+    return responses_text
 
 
 def background_format(background: str):
