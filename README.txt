@@ -35,10 +35,16 @@ PhAENix seamlessly integrates the mythical rebirth of the Phoenix with the LLM A
 
 ```bash
 git clone https://github.com/lukewu8023/agent-core.git
-cd agent-core
 ```
 
-#### 2. (Optional) Create a virtual environment
+#### 2. Create you own agent repository
+
+```bash
+mkdir x-agent
+cd x-agent
+```
+
+#### 3. (Optional) Create a virtual environment
 
 ```bash
 python -m venv venv
@@ -48,13 +54,7 @@ venv\Scripts\activate     # Windows
 
 #### 3. Install the project as a library
 
-If there is a setup.py file in the root directory, you can do:
-
-```bash
-pip install -e .
-```
-
-If no setup.py is present, you can install by referencing the directory:
+You can install by referencing the directory:
 
 ```bash
 pip install -e path/to/agent-core
