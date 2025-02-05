@@ -291,7 +291,10 @@ def execution_history_to_responses(execution_history: list):
         line = f"{record['step_result']}\n"
         response_lines.append(line)
 
-    responses_text = "\n".join(response_lines)
+    responses_text = "".join(response_lines)
+    if responses_text.endswith("\n"):
+        responses_text = responses_text[:-1]
+
     return responses_text
 
 
