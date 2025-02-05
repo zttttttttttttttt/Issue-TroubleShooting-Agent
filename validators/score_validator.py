@@ -110,9 +110,25 @@ At the end:
             )
             match_4 = re.match(r"\d+\.\s+\*\*([A-Za-z\s]+)\*\* \(Score (\d+)\):", line)
             match_5 = re.match(r"\*\*([A-Za-z\s]+)\s*\(Score\s1-5\):\s*(\d+)\*\*", line)
-            match_6 = re.match(r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\(Score\s1-5\):\*\*\s*(\d+)", line)
-            match_7 = re.match(r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\(Score\s1-5\):\s*(\d+)\*\*", line)
-            match = match_1 or match_2 or match_3 or match_4 or match_5 or match_6 or match_7
+            match_6 = re.match(
+                r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\(Score\s1-5\):\*\*\s*(\d+)", line
+            )
+            match_7 = re.match(
+                r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\(Score\s1-5\):\s*(\d+)\*\*", line
+            )
+            match_8 = re.match(
+                r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\(Score\s1-5\)\*\*:\s*(\d+)", line
+            )
+            match = (
+                match_1
+                or match_2
+                or match_3
+                or match_4
+                or match_5
+                or match_6
+                or match_7
+                or match_8
+            )
 
             if match:
                 criterion = match.group(1).strip()
