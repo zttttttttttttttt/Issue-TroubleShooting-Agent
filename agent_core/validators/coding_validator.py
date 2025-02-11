@@ -1,8 +1,10 @@
 import json
 from typing import Optional, List
-from utils.logger import get_logger
+
+import os
+
 from .base_validator import BaseValidator
-from config import Config
+from agent_core.utils.logger import get_logger
 
 
 class CodingValidator(BaseValidator):
@@ -49,9 +51,12 @@ Ensure the output is only the JSON string, with no additional characters, header
         log_level: Optional[str] = None,
         validation_threshold: Optional[float] = 0.8,  # Average score threshold
     ):
+
         self.logger = get_logger("coding-validator", log_level)
+
         if not model:
-            model = Config.DEFAULT_MODEL
+            model = os.getenv("DEFAULT_MODEL")
+
         self.model = model
         self.validation_threshold = validation_threshold
         self._prompt = self.DEFAULT_PROMPT

@@ -3,14 +3,17 @@
 from .base_model import BaseModel
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
+import os
 
 
 class DeepSeekReasonerModel(BaseModel):
     def __init__(self):
-        super().__init__(name="deepseek-reasoner")
+        super().__init__()
         self.model_instance = ChatOpenAI(
-            model="deepseek-reasoner", temperature=0.1, verbose=True
+            model_name="deepseek-reasoner", temperature=0.1, verbose=True
         )
+        os.getenv("openai_api_key")
+        pass
 
     def process(self, request: str) -> str:
         messages = [
@@ -23,3 +26,6 @@ class DeepSeekReasonerModel(BaseModel):
         else:
             # Fallback in case 'content' is missing
             return str(response)
+
+    def name(self) -> str:
+        return "deepseek-reasoner"
