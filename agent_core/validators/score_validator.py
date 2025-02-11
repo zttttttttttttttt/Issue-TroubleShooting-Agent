@@ -119,6 +119,11 @@ At the end:
             match_8 = re.match(
                 r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\(Score\s1-5\)\*\*:\s*(\d+)", line
             )
+            match_9 = re.match(r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\((\d+)/5\):\*\*", line)
+            match_10 = re.match(r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\((\d+)\):\*\*", line)
+            match_11 = re.match(
+                r"\d+\.\s+\*\*([A-Za-z\s]+)\s*\(Score:\s*(\d+)\):\*\*", line
+            )
             match = (
                 match_1
                 or match_2
@@ -128,6 +133,9 @@ At the end:
                 or match_6
                 or match_7
                 or match_8
+                or match_9
+                or match_10
+                or match_11
             )
 
             if match:
