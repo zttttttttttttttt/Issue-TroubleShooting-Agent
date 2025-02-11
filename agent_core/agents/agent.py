@@ -1,16 +1,15 @@
 # agents/agent.py
-
+import os
 from typing import Optional, List
 
-from planners.generic_planner import GenericPlanner
-from planners.graph_planner import GraphPlanner
-from validators.validators import get_validators
-from validators.base_validator import BaseValidator
-from models.model_registry import ModelRegistry
-from utils.logger import get_logger
-from utils.context_manager import get_context
-from utils.llm_chat import LLMChat
-from config import Config
+from agent_core.planners.generic_planner import GenericPlanner
+from agent_core.planners.graph_planner import GraphPlanner
+from agent_core.validators.validators import get_validators
+from agent_core.validators.base_validator import BaseValidator
+from agent_core.models.model_registry import ModelRegistry
+from agent_core.utils.logger import get_logger
+from agent_core.utils.context_manager import get_context
+from agent_core.utils.llm_chat import LLMChat
 
 
 class Agent:
@@ -71,7 +70,7 @@ Summary:
         self._summary_prompt = self.DEFAULT_SUMMARY_PROMPT
 
         if not model:
-            model = Config.DEFAULT_MODEL
+            model = os.getenv("DEFAULT_MODEL")
 
         # Use the property setter to initialize the model
         self.model = model

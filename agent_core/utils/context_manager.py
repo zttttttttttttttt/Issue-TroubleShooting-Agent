@@ -1,12 +1,12 @@
 # utils/context_manager.py
 
 import re
-from utils.logger import get_logger
+from agent_core.utils.logger import get_logger
 
 
 class ContextManager:
 
-    logger = get_logger("contect manager")
+    logger = get_logger("context manager")
 
     def __init__(self):
         self.context = {}

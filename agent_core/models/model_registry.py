@@ -1,14 +1,11 @@
 # models/model_registry.py
 
-from abc import ABC, abstractmethod
 import pkgutil
 import importlib
 import os
-import logging
 
-from config.config import load_config
 from .base_model import BaseModel  # Updated import
-from utils.logger import get_logger
+from agent_core.utils.logger import get_logger
 
 
 def load_models_dynamically(logger):    
@@ -19,7 +16,7 @@ def load_models_dynamically(logger):
     package_name = __package__  # Should be 'models'
 
     for _, module_name, _ in pkgutil.iter_modules([package_dir]):
-        if module_name.startswith("_") or module_name == "model_registry":
+        if module_name.startswith("_") or module_name in ["model_registry", "base_model"]:
             continue  # Skip private modules and model_registry itself
         module = importlib.import_module(f".{module_name}", package=package_name)
         # Iterate through attributes to find subclasses of BaseModel
@@ -44,12 +41,11 @@ class ModelRegistry:
         cls.logger.info(f"Registered model: {model.name}")
 
     @classmethod
-    def get_model(cls, name: str) -> BaseModel:
+    def get_model(cls, name: str):
         return cls._models.get(name, None)
 
     @classmethod
     def load_models(cls, log_level: str = None):
-        load_config()  # Ensure configuration is loaded
         logger = get_logger("model-loader", log_level)
         try:
             load_models_dynamically(logger)

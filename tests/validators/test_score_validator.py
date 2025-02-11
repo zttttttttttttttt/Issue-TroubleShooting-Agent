@@ -1,8 +1,8 @@
 # tests/validators/test_score_validator.py
 
 import pytest
-from validators.score_validator import ScoreValidator
-from models.model_registry import ModelRegistry
+from agent_core.validators import ScoreValidator
+from agent_core.models import ModelRegistry
 
 
 @pytest.fixture

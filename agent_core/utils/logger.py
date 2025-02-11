@@ -1,8 +1,7 @@
 # utils/logger.py
 
 import logging
-from config.config import Config
-
+import os
 
 def get_logger(name="agent-core", log_level: str = None) -> logging.Logger:
     """
@@ -22,7 +21,7 @@ def get_logger(name="agent-core", log_level: str = None) -> logging.Logger:
         logger.addHandler(handler)
 
     # If a log_level is specified, use it; otherwise use the framework default
-    effective_level = log_level.upper() if log_level else Config.DEFAULT_LOG_LEVEL
+    effective_level = log_level.upper() if log_level else os.getenv("AGENT_CORE_LOG_LEVEL")
     logger.setLevel(effective_level)
 
     return logger

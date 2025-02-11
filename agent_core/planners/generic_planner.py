@@ -2,12 +2,11 @@
 
 import json
 from typing import List, Optional
-
+import os
 from langchain_core.tools import BaseTool
 
-from models.model_registry import ModelRegistry
-from utils.logger import get_logger
-from config import Config
+from agent_core.models.model_registry import ModelRegistry
+from agent_core.utils.logger import get_logger
 from .base_planner import BasePlanner
 
 
@@ -128,7 +127,7 @@ Steps:
         """
         self.logger = get_logger("generic-planner", log_level)
         if not model:
-            model = Config.DEFAULT_MODEL
+            model = os.getenv("DEFAULT_MODEL")
 
         self.model_name = model
         self.model = ModelRegistry.get_model(self.model_name)
@@ -291,7 +290,7 @@ Steps:
         for idx, step in enumerate(steps, 1):
             # Possibly incorporate the context in the step prompt
             if execution_history and context_manager:
-                from agents.agent import execution_history_to_str
+                from agent_core.agents import execution_history_to_str
 
                 context_manager.add_context(
                     "Execution History",

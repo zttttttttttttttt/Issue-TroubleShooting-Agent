@@ -7,9 +7,9 @@ from langchain_core.messages import HumanMessage
 
 class GPT35TURBOModel(BaseModel):
     def __init__(self):
-        super().__init__(name="gpt-3.5-turbo")
+        super().__init__()
         self.model_instance = ChatOpenAI(
-            model="gpt-3.5-turbo", temperature=0.1, verbose=True
+            model_name="gpt-3.5-turbo", temperature=0.1, verbose=True
         )
 
     def process(self, request: str) -> str:
@@ -24,3 +24,6 @@ class GPT35TURBOModel(BaseModel):
         else:
             # Fallback in case 'content' is missing
             return str(response)
+
+    def name(self) -> str:
+        return "gpt-3.5-turbo"

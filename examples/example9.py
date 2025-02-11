@@ -8,11 +8,11 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
-from agents import Agent
-from planners import GenericPlanner
-from validators.score_validator import ScoreValidator
+from agent_core.agents import Agent
+from agent_core.planners import GenericPlanner
+from agent_core.validators.score_validator import ScoreValidator
 
-from config.config import Config
+from agent_core.config import Config
 
 # Globally sets the log level to DEBUG for detailed logging across the framework
 Config.set_log_level("DEBUG")

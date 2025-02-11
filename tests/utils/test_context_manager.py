@@ -1,7 +1,6 @@
 # tests/utils/test_context_manager.py
 
-import pytest
-from utils.context_manager import ContextManager
+from agent_core.utils.context_manager import ContextManager
 
 
 def test_add_remove_context():
