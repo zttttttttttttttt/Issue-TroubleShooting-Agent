@@ -49,7 +49,7 @@ By overriding these prompts, developers can tailor the output style, instruction
 1. **Initialize and Configure the Agent**
 
 ```python
-from agents.agent import Agent
+from agent_core.agents import Agent
 
 # Create agent instance
 agent = Agent()
@@ -78,7 +78,7 @@ agent.summary_prompt = "Here is a custom summary for steps:\n{history_text}"
 4. **Use a Planner (e.g. GenericPlanner) and Override Its Prompt**
 
 ```python
-from planners.generic_planner import GenericPlanner
+from agent_core.planners.generic_planner import GenericPlanner
 
 planner = GenericPlanner()
 print("Default Planner Prompt:\n", planner.prompt)
@@ -88,13 +88,13 @@ Task: {task}
 Tools: {tools_knowledge}
 Output JSON with two main steps.
 """
-agent.planner = planner # Attach to the agent
+agent.planner = planner  # Attach to the agent
 ```
 
 5. **Override a Validator Prompt (e.g. ScoreValidator)**
 
 ```python
-from validators.score_validator import ScoreValidator
+from agent_core.validators import ScoreValidator
 
 validator = ScoreValidator()
 print("Default Validator Prompt:\n", validator.prompt)

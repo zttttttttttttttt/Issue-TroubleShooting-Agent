@@ -4,7 +4,7 @@ with open("requirements.txt") as f:
     requirements = f.read().splitlines()
 
 setup(
-    name="agent-core",  # Package name
+    name="agent_core",  # Package name
     version="0.1.0",  # Package version
     author="Luke Wu",
     author_email="luke8023@gmail.com",

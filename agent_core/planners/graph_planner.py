@@ -1,6 +1,6 @@
 # planners/graph_planner.py
 
-import re
+import os
 import json
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -8,14 +8,11 @@ from typing import List, Dict, Optional
 
 from langchain_core.tools import BaseTool
 
-from validators import ScoreValidator
 from .base_planner import BasePlanner
 from .generic_planner import GenericPlanner, Step
-from models.model_registry import ModelRegistry
-from config import Config
-from utils.logger import get_logger
-from utils.context_manager import ContextManager
-from utils.llm_chat import LLMChat
+from agent_core.models.model_registry import ModelRegistry
+from agent_core.utils.logger import get_logger
+from agent_core.utils.context_manager import ContextManager
 
 
 @dataclass
@@ -193,7 +190,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         self.logger = get_logger("graph-planner", log_level)
 
         if not model:
-            model = Config.DEFAULT_MODEL
+            model = os.getenv("DEFAULT_MODEL")
         self.model_name = model
         self.model = ModelRegistry.get_model(self.model_name)
         if not self.model:

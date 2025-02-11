@@ -3,9 +3,9 @@
 import re
 import json
 from typing import Optional
-from models.model_registry import ModelRegistry
-from config.config import Config
-from utils.logger import get_logger
+from agent_core.models.model_registry import ModelRegistry
+from agent_core.utils.logger import get_logger
+import os
 
 
 class LLMChat:
@@ -39,7 +39,8 @@ Now, produce your evaluation:
         """
         self.logger = get_logger("llm-chat", log_level)
         if not model_name:
-            model_name = Config.DEFAULT_MODEL
+            model_name = os.getenv("DEFAULT_MODEL")
+
 
         self.model_name = model_name
         self.model = ModelRegistry.get_model(self.model_name)

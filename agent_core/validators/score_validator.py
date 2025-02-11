@@ -2,9 +2,9 @@
 
 import re
 from typing import Optional
-from utils.logger import get_logger
+from agent_core.utils.logger import get_logger
 from .base_validator import BaseValidator
-from config import Config
+import os
 
 
 class ScoreValidator(BaseValidator):
@@ -60,7 +60,7 @@ At the end:
         self.logger = get_logger("score-validator", log_level)
 
         if not model:
-            model = Config.DEFAULT_MODEL
+            model = os.getenv("DEFAULT_MODEL")
 
         self.model = model
         self.validation_threshold = validation_threshold
@@ -164,7 +164,7 @@ At the end:
 
 # Example usage as standalone script:
 if __name__ == "__main__":
-    from models.model_registry import ModelRegistry
+    from agent_core.models import ModelRegistry
 
     # For demonstration, get a mock model from your registry
     # (replace "gpt-4o-mini" with whatever is registered in your system)
