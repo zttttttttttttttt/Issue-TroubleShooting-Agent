@@ -1,6 +1,7 @@
 # planners/graph_planner.py
 
 import os
+import re
 import json
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -10,9 +11,11 @@ from langchain_core.tools import BaseTool
 
 from .base_planner import BasePlanner
 from .generic_planner import GenericPlanner, Step
+from agent_core.validators import ScoreValidator
 from agent_core.models.model_registry import ModelRegistry
 from agent_core.utils.logger import get_logger
 from agent_core.utils.context_manager import ContextManager
+from agent_core.utils.llm_chat import LLMChat
 
 
 @dataclass
@@ -147,11 +150,11 @@ You are an intelligent assistant helping to adjust a task execution plan represe
 
 **Instructions:**
 - Analyze the Current Plan, Execution History, Failure Reason and Replanning History to decide on one of two actions:
-    1. **breakdown**: Break down the failed task into smaller subtasks.
+    1. **breakdown**: Break down the task of failed node {current_node_id} into smaller subtasks.
     2. **replan**: Go back to a previous node for replanning, 
 - If you choose **breakdown**, provide detailed descriptions of the new subtasks, only breakdown the current (failed) node, otherwise it should be replan. ex: if current node is B, breakdown nodes should be B.1, B.2, if current node is B.2, breakdown nodes should be B.2.1, B.2.2... and make the all nodes as chain eventually.
 - If you choose **replan**, specify which node to return to and suggest any modifications to the plan after that node, do not repeat previous faillure replanning in the Replanning History.
-- The id generated following the naming convention as A.1, B.1.2, C.2.5.2, new id (not next_nodes) generation example: current: B > new sub: B.1, current: B.2 > new sub: B.2.1
+- The id generated following the naming convention as A.1, B.1.2, C.2.5.2, new id (not next_nodes) generation example: current: B > new sub: B.1, current: B.2.2.2 > new sub: B.2.2.2.1
 - Return your response in the following JSON format (do not include any additional text):
 
 ```json
@@ -571,6 +574,7 @@ Task response: {response}
             execution_history=failure_info["execution_history"],
             failure_reason=failure_info["failure_reason"],
             replan_history=failure_info["replan_history"],
+            current_node_id=plan_graph.current_node_id,
         )
 
         self.logger.info("Calling model for replan instructions...")
