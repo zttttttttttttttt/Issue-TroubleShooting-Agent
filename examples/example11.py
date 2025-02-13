@@ -1,19 +1,8 @@
 # examples/example11.py
-import sys
-import os
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
 
 from agent_core.agents import Agent
 from agent_core.planners.generic_planner import GenericPlanner
-
-# Suppose you created a specialized WrittingValidator or CodingValidator
 from agent_core.validators.score_validator import ScoreValidator
-
-# from validators.coding_validator import CodingValidator
-# from validators.writting_validator import WrittingValidator
 
 
 def main():
@@ -27,11 +16,11 @@ def main():
     print("Default validators:", agent.validators)
 
     # 3) Add a new validator
-    writting_validator = ScoreValidator(agent.model)
-    agent.add_validator("writing", writting_validator)
+    writing_validator = ScoreValidator(agent.model_name)
+    agent.add_validator("writing", writing_validator)
 
     # 4) Update existing category
-    coding_validator = ScoreValidator(agent.model)
+    coding_validator = ScoreValidator(agent.model_name)
     agent.update_validator("coding", coding_validator)
 
     print("Validators after updates:", agent.validators)

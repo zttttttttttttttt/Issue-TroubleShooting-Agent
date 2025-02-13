@@ -1,21 +1,8 @@
 # examples/example9.py
 
-import sys
-import os
-
-# Add the parent directory to sys.path to allow imports from the framework
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
-
 from agent_core.agents import Agent
 from agent_core.planners import GenericPlanner
 from agent_core.validators.score_validator import ScoreValidator
-
-from agent_core.config import Config
-
-# Globally sets the log level to DEBUG for detailed logging across the framework
-Config.set_log_level("DEBUG")
 
 
 def main():
@@ -23,7 +10,7 @@ def main():
     Demonstrates how to override default prompts for:
     1) Validator (ScoreValidator)
     2) Agent single-step execution
-    3) Planner multi-step prompt
+    3) Planner multistep prompt
     4) Agent's final summary prompt
 
     These overrides only apply to the current instances of validator, agent, and planner.

@@ -5,6 +5,8 @@ from typing import List, Optional
 
 from langchain_core.tools import BaseTool
 
+from agent_core.entities.steps import Steps
+
 
 class BasePlanner(ABC):
     """
@@ -17,12 +19,11 @@ class BasePlanner(ABC):
         self,
         task: str,
         tools: Optional[List[BaseTool]],
-        execute_history: list = None,
+        execute_history: Steps,
         knowledge: str = "",
         background: str = "",
         categories: Optional[List[str]] = None,
-        agent=None,
-    ):
+    ) -> Steps:
         """
         Generates a plan (list of Steps, or node-based structure, etc.) from the LLM.
         """

@@ -1,13 +1,5 @@
 # examples/example6.py
 
-import sys
-import os
-
-# Add the parent directory to sys.path to allow imports from the framework
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
-
 from agent_core.agents import Agent
 from agent_core.planners import GraphPlanner
 from langchain_core.tools import tool
@@ -63,7 +55,7 @@ def get_trace(trace_id: Annotated[str, "trace id"]) -> List:
 
 
 def main():
-    agent = Agent(model="gpt-4o-mini")
+    agent = Agent(model_name="gpt-4o-mini")
 
     agent.tools = [get_event, get_metric, get_log, get_trace]
     agent.planner = GraphPlanner()
@@ -72,7 +64,7 @@ def main():
     agent.execute(task)
 
     execution_history = agent.execution_history
-    print(f"Execution History: {execution_history}")
+    print(f"Execution History: {execution_history.execution_history_to_str()}")
     execution_result = agent.get_execution_result_summary()
     print(f"Execution Result: {execution_result}")
 

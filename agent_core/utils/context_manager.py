@@ -34,8 +34,6 @@ class ContextManager:
         if key in self.context:
             del self.context[key]
             self.logger.info(f"Remove '{key}' from the context.")
-        else:
-            self.logger.info(f"Key '{key}' not found in context.")
 
     def context_to_str(self):
         """

@@ -48,7 +48,7 @@ At the end:
 
     def __init__(
         self,
-        model: Optional[str] = None,
+        model_name: Optional[str] = None,
         log_level: Optional[str] = None,
         validation_threshold: Optional[float] = 0.9,
     ):
@@ -59,10 +59,7 @@ At the end:
         """
         self.logger = get_logger("score-validator", log_level)
 
-        if not model:
-            model = os.getenv("DEFAULT_MODEL")
-
-        self.model = model
+        self.model_name = model_name if model_name else os.getenv("DEFAULT_MODEL")
         self.validation_threshold = validation_threshold
         self._prompt = self.DEFAULT_PROMPT
 
@@ -159,13 +156,14 @@ At the end:
         """
         Mandatory method from BaseValidator. Must return (decision, score, details).
         """
+
         prompt_text = self._prompt.format(request=request, response=response)
-        validation_response = self.model.process(prompt_text)
+        model = ModelRegistry.get_model(self.model_name)
+        validation_response = model.process(prompt_text)
         # return validation_response
         decision, total_score, scores = self.parse_scored_validation_response(
             validation_response
         )
-
         details = {"score_breakdown": scores, "raw_evaluation": validation_response}
         return decision, total_score, details
 
