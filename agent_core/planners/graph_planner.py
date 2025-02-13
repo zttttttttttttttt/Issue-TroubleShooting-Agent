@@ -15,7 +15,6 @@ from agent_core.utils.logger import get_logger
 from agent_core.utils.context_manager import ContextManager
 from agent_core.utils.llm_chat import LLMChat
 from ..entities.steps import Steps
-from ..validators.base_validator import BaseValidator
 
 
 @dataclass

@@ -1,5 +1,4 @@
 langchain-core~=0.3.35
-setuptools~=68.2.0
 python-dotenv~=1.0.1
 pydantic~=2.10.6
 pydantic-settings~=2.7.1
