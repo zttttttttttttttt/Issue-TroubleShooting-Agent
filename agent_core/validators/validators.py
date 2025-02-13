@@ -9,7 +9,7 @@ def get_validators(model_instance):
     This is the default mapping used when an Agent is created.
     """
     return {
-        "writting": ScoreValidator(model_instance),
+        "writing": ScoreValidator(model_instance),
         "summarization": ScoreValidator(model_instance),
         "action": ScoreValidator(model_instance),
         "coding": CodingValidator(model_instance),

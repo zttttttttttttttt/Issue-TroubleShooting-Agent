@@ -1,7 +1,6 @@
 # planners/graph_planner.py
 
 import os
-import re
 import json
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -11,11 +10,12 @@ from langchain_core.tools import BaseTool
 
 from .base_planner import BasePlanner
 from .generic_planner import GenericPlanner, Step
-from agent_core.validators import ScoreValidator
 from agent_core.models.model_registry import ModelRegistry
 from agent_core.utils.logger import get_logger
 from agent_core.utils.context_manager import ContextManager
 from agent_core.utils.llm_chat import LLMChat
+from ..entities.steps import Steps
+from ..validators.base_validator import BaseValidator
 
 
 @dataclass
@@ -187,20 +187,12 @@ You are an intelligent assistant helping to adjust a task execution plan represe
 
     def __init__(
         self,
-        model: str = None,
+        model_name: str = None,
         log_level: Optional[str] = None,
     ):
         self.logger = get_logger("graph-planner", log_level)
-
-        if not model:
-            model = os.getenv("DEFAULT_MODEL")
-        self.model_name = model
+        self.model_name = model_name if model_name else os.getenv("DEFAULT_MODEL")
         self.model = ModelRegistry.get_model(self.model_name)
-        if not self.model:
-            self.logger.error(f"Model '{self.model_name}' not found for planning.")
-            raise ValueError(
-                f"Model '{self.model_name}' is not supported for planning."
-            )
         self.logger.info(f"GraphPlanner initialized with model: {self.model.name}")
 
         self.plan_graph: Optional[PlanGraph] = None
@@ -232,12 +224,11 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         self,
         task: str,
         tools: Optional[List[BaseTool]],
-        execute_history: list = None,
+        execute_history: Steps,
         knowledge: str = "",
         background: str = "",
         categories: Optional[List[str]] = None,
-        agent=None,
-    ) -> List[Step]:
+    ) -> Steps:
         """
         1) Call GenericPlanner to obtain a list of Steps using the same arguments.
         2) Convert those Steps into a PlanGraph with Node objects.
@@ -246,15 +237,14 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         self.logger.info(f"GraphPlanner: Creating plan for task: {task}")
 
         # Use GenericPlanner internally to get the steps
-        generic_planner = GenericPlanner(model=self.model_name, log_level=None)
-        steps = generic_planner.plan(
+        generic_planner = GenericPlanner(model_name=self.model_name, log_level=None)
+        plan = generic_planner.plan(
             task=task,
             tools=tools,
             execute_history=execute_history,
             knowledge=knowledge,
             background=background,
             categories=categories,
-            agent=agent,
         )
 
         # Convert Steps -> Node objects in a new PlanGraph
@@ -268,9 +258,9 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         if tools is not None:
             tool_map = {tool.name: tool for tool in tools}
 
-        for idx, step in enumerate(steps, start=1):
+        for idx, step in enumerate(plan.steps, start=1):
             node_id = chr(65 + idx - 1)  # e.g., A, B, C...
-            next_node_id = chr(65 + idx) if idx < len(steps) else ""
+            next_node_id = chr(65 + idx) if idx < len(plan.steps) else ""
 
             node = Node(
                 id=node_id,
@@ -289,13 +279,15 @@ You are an intelligent assistant helping to adjust a task execution plan represe
             previous_node = node
 
         self.plan_graph = plan_graph
-        return steps
+        return plan
 
     def execute_plan(
         self,
-        steps: List[Step],
-        execution_history: list,
-        agent=None,
+        plan: Steps,
+        execution_history: Steps,
+        validators_enabled: bool,
+        validators: dict,
+        llm_chat: LLMChat,
         context_manager=None,
         background: str = "",
     ):
@@ -311,7 +303,6 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         self._background = background
         if context_manager:
             self.context_manager = context_manager
-        self.agent = agent
 
         pg = self.plan_graph
         pg.current_node_id = pg.current_node_id or pg.start_node_id
@@ -323,8 +314,8 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                 break
 
             node = pg.nodes[pg.current_node_id]
-            result = self._execute_node(node, agent)
-            score, details = self._validate_node(node, result, agent)
+            result = self._execute_node(node, self.model_name)
+            score, details = self._validate_node(node, result, validators_enabled, validators)
             self.logger.info(f"Node {node.id} execution score: {score}")
 
             if score >= node.validation_threshold:
@@ -337,14 +328,13 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                     )
 
                 node.result = result
-                execution_history.append(
-                    {
-                        "step_name": node.id,
-                        "step_description": node.task_description,
-                        "step_result": str(result),
-                    }
+                execution_history.add_step(
+                    Step(
+                        name=node.id,
+                        description=node.task_description,
+                        result=str(result)
+                    )
                 )
-                # Move on
                 if node.next_nodes:
                     pg.current_node_id = node.next_nodes[0]
                 else:
@@ -355,7 +345,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                     self.logger.warning(f"Replanning needed at Node {node.id}")
                     failure_info = self.prepare_failure_info(node)
                     replan_response = self.call_llm_for_replan(pg, failure_info)
-                    adjustments = self.agent.llm_chat.parse_llm_response(
+                    adjustments = llm_chat.parse_llm_response(
                         replan_response
                     )
                     if adjustments:
@@ -371,7 +361,6 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                                 "llm_response": adjustments,
                             }
                         )
-                        # adjustments_json = self.agent.llm_chat.parse_llm_response(adjustments)
                         apply_adjustments_to_plan(self.plan_graph, node.id, adjustments)
                         self.logger.info(
                             f"New plan after adjusted: {self.plan_graph.nodes}"
@@ -406,10 +395,9 @@ Task critic details: {details}
                         )
 
                     continue
-
         return "Task execution completed using GraphPlanner."
 
-    def _execute_node(self, node: Node, agent) -> str:
+    def _execute_node(self, node: Node, model_name: str) -> str:
         """
         Build prompt + call the LLM. If 'use_tool', invoke the tool.
         """
@@ -441,7 +429,7 @@ Task critic details: {details}
             tool_description=tool_description,
         )
 
-        response = agent.model.process(final_prompt)
+        response = ModelRegistry.get_model(model_name).process(final_prompt)
         cleaned = response.replace("```json", "").replace("```", "").strip()
         try:
             data = json.loads(cleaned)
@@ -478,23 +466,23 @@ Task response: {response}
         self.logger.info(f"Response: {response}")
         return response
 
-    def _validate_node(self, node: Node, result: str, agent):
+    def _validate_node(self, node: Node, result: str, validators_enabled: bool, validators: dict):
         """
         Validate the node output using agent's validator if enabled.
         Return 0..1 scale.
         """
-        if not agent or not agent.validators_enabled:
+        if not validators_enabled:
             # Validation is disabled; treat as success
             execution_result = ExecutionResult(
                 output=result, validation_score=1.0, timestamp=datetime.now()
             )
             node.execution_results.append(execution_result)
-            return 1.0
+            return 1.0, ''
 
         chosen_cat = (
-            node.task_category if node.task_category in agent.validators else "default"
+            node.task_category if node.task_category in validators else "default"
         )
-        validator = agent.validators.get(chosen_cat)
+        validator = validators.get(chosen_cat)
         if not validator:
             self.logger.warning(
                 f"No validator found for category '{chosen_cat}'. Validation skipped."
@@ -631,25 +619,6 @@ Task response: {response}
         )
         for node in nodes_to_remove:
             self.context_manager.remove_context(node)
-
-
-#
-# HELPER FUNCTIONS
-#
-# def evaluate_result(rtask_description: str, result: str, model) -> float:
-#     """
-#     Use ScoreValidator(model) to parse and produce a numeric score [0..1].
-#     """
-#     sv = ScoreValidator(model)  # Pass the model here
-#     validation_str = sv.validate(rtask_description, result)
-#     print(validation_str)
-#     decision, total_score, scores = sv.parse_scored_validation_response(validation_str)
-#     print("\nTotal Score:", total_score)
-#     print("Scores by Criterion:", scores)
-#     print("Final Decision:", decision)
-
-#     # e.g., total_score=35 => 35/40=0.875
-#     return total_score / 40
 
 
 def apply_adjustments_to_plan(

@@ -41,8 +41,11 @@ class ModelRegistry:
         cls.logger.info(f"Registered model: {model.name}")
 
     @classmethod
-    def get_model(cls, name: str):
-        return cls._models.get(name, None)
+    def get_model(cls, name: str) -> BaseModel:
+        if name not in cls._models:
+            cls.logger.error(f"Model '{name}' not found in registry.")
+            raise ValueError(f"Model '{name}' is not supported.")
+        return cls._models.get(name)
 
     @classmethod
     def load_models(cls, log_level: str = None):

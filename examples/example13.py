@@ -1,17 +1,12 @@
 # examples/example13.py
-import sys
-import os
 
 from agent_core.agents import Agent
 from agent_core.planners import GenericPlanner
 from agent_core.validators.coding_validator import CodingValidator
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
-
 
 def main():
+
     agent = Agent()
     agent.planner = GenericPlanner()
 
@@ -22,7 +17,7 @@ def main():
     print("Default validators:", agent.validators)
 
     # 3) Add a new validator
-    coding_validator = CodingValidator(agent.model)
+    coding_validator = CodingValidator(agent.model_name)
     agent.add_validator("coding", coding_validator)
 
     print("Validators after updates:", agent.validators)

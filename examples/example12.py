@@ -1,18 +1,7 @@
 # examples/example12.py
 
-import sys
-import os
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
-
 from agent_core.agents import Agent
 from agent_core.planners.generic_planner import GenericPlanner
-
-from agent_core.config import Config
-
-Config.set_log_level("DEBUG")  # globally set to DEBUG
 
 
 def main():
@@ -22,7 +11,7 @@ def main():
     print(agent.llm_chat.evaluate_text_prompt)
     print(agent.llm_chat.process("Who are you?"))
 
-    task = "3 steps to write a peom about flower"
+    task = "3 steps to write a poem about flower"
     agent.execute(task)
 
     execution_history = agent.execution_history
