@@ -66,3 +66,9 @@ class Steps:
 
     def add_step(self, step: Step):
         self.steps.append(step)
+
+    def to_dict(self):
+        # Convert the Steps instance to a dictionary
+        return {
+            "steps": [step.to_dict() for step in self.steps]
+        }
