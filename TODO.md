@@ -11,7 +11,6 @@
 - change validator to evaluator (done)
 - abstract validator base, unique output return (done)
 - adjust planner prompt to use tool better (done)
-- more unit testing
 - knowledge graph to collect sufficient information
 - bug
 ```json
@@ -25,7 +24,7 @@
 ```
 
 ### Test
-- unit testing
+- more unit testing
 - 
 ### UI
 - UI interaction
