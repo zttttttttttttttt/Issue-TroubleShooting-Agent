@@ -1,17 +1,18 @@
 # TODO
 
 ### Feature
-- knowledge graph to collect sufficient information
+- pass parent task for all step execution (done)
+- fix background used in planner (done)
+- validation add execution history (done)
+- compatible with autogen and langgraph
+- expose generic planner prompt from graph planner (done)
 - change context by step  (done?)
 - validation retry in generic planner
 - change validator to evaluator (done)
-- generic model creation and config (done)
-- fix background used in planner (done)
-- expose generic planner prompt from graph planner (done)
-- validation add execution history (done)
-- abstract validator base, unique output return  (done)
-- pass parent task for all step execution  (done)
-- adjust planner prompt to use tool better  (done)
+- abstract validator base, unique output return (done)
+- adjust planner prompt to use tool better (done)
+- more unit testing
+- knowledge graph to collect sufficient information
 - bug
 ```json
 {
@@ -36,8 +37,9 @@
 - add FAQ section
 
 # Completed
+- generic model creation and config
 - stream processing for each step during the execution
-- step validator by category, support costomized
+- step validator by category, support customized
 - history planning experience for improving
-- successful geratation rate
+- successful generation rate
 - put example in another project
