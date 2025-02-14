@@ -11,7 +11,7 @@ sys.path.insert(0, parent_dir)
 
 from agent_core.agents import Agent
 from agent_core.planners import GenericPlanner
-from agent_core.validators.coding_validator import CodingValidator
+from agent_core.evaluator.coding_evaluator import CodingEvaluator
 
 
 def main():
@@ -19,17 +19,17 @@ def main():
     agent = Agent()
     agent.planner = GenericPlanner()
 
-    # 1) Enable validation
-    agent.enable_validators()
+    # 1) Enable evaluation
+    agent.enable_evaluators()
 
-    # 2) See default validator mapping
-    print("Default validators:", agent.validators)
+    # 2) See default evaluator mapping
+    print("Default evaluator:", agent.evaluators)
 
-    # 3) Add a new validator
-    coding_validator = CodingValidator(agent.model_name)
-    agent.add_validator("coding", coding_validator)
+    # 3) Add a new evaluator
+    coding_evaluator = CodingEvaluator(agent.model_name)
+    agent.add_evaluator("coding", coding_evaluator)
 
-    print("Validators after updates:", agent.validators)
+    print("evaluators after updates:", agent.evaluators)
 
     # 4) Execute a simple task
     task = "Implement a function that calculates the factorial of a number, with proper error handling and documentation."

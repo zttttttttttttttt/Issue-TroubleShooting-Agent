@@ -1,7 +1,7 @@
-# tests/validators/test_score_validator.py
+# tests/evaluator/test_score_evaluator.py
 
 import pytest
-from agent_core.validators import ScoreValidator
+from agent_core.evaluator import GenericEvaluator
 from agent_core.models import ModelRegistry
 
 
@@ -11,22 +11,22 @@ def mock_model():
 
 
 @pytest.fixture
-def score_validator(mock_model):
-    return ScoreValidator(mock_model)
+def score_evaluator(mock_model):
+    return GenericEvaluator(mock_model)
 
 
-def test_score_validator(score_validator):
-    """Test basic score validation result structure."""
-    decision, total_score, details = score_validator.validate("Say hi", "Hi there!")
+def test_score_evaluator(score_evaluator):
+    """Test basic score evaluation result structure."""
+    evaluator_result = score_evaluator.evaluate("Say hi", "Hi there!")
     # We can't fully control LLM response, but we can check structure
-    assert decision in ("Accept Output", "Rerun Subtask")
-    assert isinstance(total_score, int) or isinstance(total_score, float)
-    assert "score_breakdown" in details
-    assert "raw_evaluation" in details
+    assert evaluator_result.decision in ("Accept Output", "Rerun Subtask")
+    assert isinstance(evaluator_result.total_score, int) or isinstance(evaluator_result.total_score, float)
+    assert "score_breakdown" in evaluator_result.details
+    assert "raw_evaluation" in evaluator_result.details
 
 
-def test_parse_scored_validation_response_1(score_validator):
-    validation_response = """
+def test_parse_scored_evaluation_response_1(score_evaluator):
+    evaluation_response = """
 1. **Accuracy (Score 1-5):** 4  
    **Justification:** The output accurately identifies the components of a flower (petals, stem, leaves) and assigns characters to each part. However, it could be more specific about the arrangement of the characters in relation to each other.
 
@@ -58,15 +58,15 @@ def test_parse_scored_validation_response_1(score_validator):
 **Suggestions for Improvement:**  
 - Provide a more detailed description of how the characters are arranged spatially to visually represent a flower shape. For example, specify the positioning of the petals around the stem and how the leaves are placed in relation to the stem. This would enhance both completeness and clarity.
    """
-    decision, total_score, scores = score_validator.parse_scored_validation_response(
-        validation_response
+    decision, total_score, scores = score_evaluator.parse_scored_evaluation_response(
+        evaluation_response
     )
     assert decision in ("Accept Output", "Rerun Subtask")
     assert total_score == 35
 
 
-def test_parse_scored_validation_response_2(score_validator):
-    validation_response = """
+def test_parse_scored_evaluation_response_2(score_evaluator):
+    evaluation_response = """
 1. **Accuracy** (Score 5): The output accurately identifies the components of a flower (petals, stem, leaves) and assigns them to specific computer characters.
 
 2. **Completeness** (Score 5): The output addresses all aspects of the subtask by providing a character for each part of the flower.
@@ -89,16 +89,16 @@ def test_parse_scored_validation_response_2(score_validator):
 
 The output meets all criteria effectively, scoring above 35 with no individual criterion below 3.
     """
-    decision, total_score, scores = score_validator.parse_scored_validation_response(
-        validation_response
+    decision, total_score, scores = score_evaluator.parse_scored_evaluation_response(
+        evaluation_response
     )
     assert decision in ("Accept Output", "Rerun Subtask")
     assert total_score == 40
     assert len(scores) is 8
 
 
-def test_parse_scored_validation_response_3(score_validator):
-    validation_response = """
+def test_parse_scored_evaluation_response_3(score_evaluator):
+    evaluation_response = """
 1. **Accuracy (Score 1-5):** 2  
    **Justification:** The output does not accurately represent a flower's arrangement. The use of "computer character A," "computer character B," and "computer character C" is vague and does not provide a clear depiction of the flower's features.
 
@@ -131,16 +131,16 @@ def test_parse_scored_validation_response_3(score_validator):
 - Consider the arrangement of the components to enhance visual appeal, such as varying the sizes of petals or adding details about their placement.
 - Ensure that the output aligns more closely with the task of enhancing the flower's appearance rather than simply listing components.
     """
-    decision, total_score, scores = score_validator.parse_scored_validation_response(
-        validation_response
+    decision, total_score, scores = score_evaluator.parse_scored_evaluation_response(
+        evaluation_response
     )
     assert decision in ("Accept Output", "Rerun Subtask")
     assert total_score == 23
     assert len(scores) is 8
 
 
-def test_parse_scored_validation_response_4(score_validator):
-    validation_response = """
+def test_parse_scored_evaluation_response_4(score_evaluator):
+    evaluation_response = """
 1. **Accuracy (Score 1-5): 2**
    - **Justification:** The output does not accurately represent a flower's arrangement. The use of "computer character A," "computer character B," and "computer character C" is vague and does not provide a clear depiction of a flower's physical attributes.
 
@@ -173,16 +173,16 @@ def test_parse_scored_validation_response_4(score_validator):
   - Include details about the arrangement, such as the number of petals, their shape, and how they are positioned relative to the stem and leaves.
   - Provide a more vivid description that enhances the visual appeal of the flower.
     """
-    decision, total_score, scores = score_validator.parse_scored_validation_response(
-        validation_response
+    decision, total_score, scores = score_evaluator.parse_scored_evaluation_response(
+        evaluation_response
     )
     assert decision in ("Accept Output", "Rerun Subtask")
     assert total_score == 22
     assert len(scores) is 8
 
 
-def test_parse_scored_validation_response_5(score_validator):
-    validation_response = """
+def test_parse_scored_evaluation_response_5(score_evaluator):
+    evaluation_response = """
 1. **Accuracy (Score 1-5): 3**
    - **Justification:** The output identifies characters for petals, stem, and leaves, but the choices are not accurate representations of typical flower anatomy. A rose is a flower, but a cactus is not a typical stem for a flower, and while ferns have leaves, they are not commonly associated with flowering plants.
 
@@ -213,16 +213,16 @@ def test_parse_scored_validation_response_5(score_validator):
 - **Suggestions for Improvement:**
   - Choose characters that are more representative of a flower's anatomy. For example, for petals, consider using "Daisy" or "Lily," for the stem, a "Sunflower" or "Tulip," and for leaves, perhaps "Maple" or "Oak" to better reflect typical flowering plants.
     """
-    decision, total_score, scores = score_validator.parse_scored_validation_response(
-        validation_response
+    decision, total_score, scores = score_evaluator.parse_scored_evaluation_response(
+        evaluation_response
     )
     assert decision in ("Accept Output", "Rerun Subtask")
     assert total_score == 35
     assert len(scores) is 8
 
 
-def test_parse_scored_validation_response_6(score_validator):
-    validation_response = """
+def test_parse_scored_evaluation_response_6(score_evaluator):
+    evaluation_response = """
 1. **Accuracy (Score 1-5): 2**
    - **Justification:** The output inaccurately assigns characters to the flower's parts. For example, 'Lily' is a type of flower and not a character representing petals, and 'Sunflower' is also a flower, not a stem character. 
 
@@ -254,16 +254,16 @@ def test_parse_scored_validation_response_6(score_validator):
   - Select characters that are more representative of the flower's petals, stem, and leaves. For example, use characters that are commonly associated with these parts in botanical illustrations or educational contexts.
   - Ensure that the characters chosen are not themselves types of flowers, as this creates confusion regarding their representation.
     """
-    decision, total_score, scores = score_validator.parse_scored_validation_response(
-        validation_response
+    decision, total_score, scores = score_evaluator.parse_scored_evaluation_response(
+        evaluation_response
     )
     assert decision in ("Accept Output", "Rerun Subtask")
     assert total_score == 24
     assert len(scores) is 8
 
 
-def test_parse_scored_validation_response_7(score_validator):
-    validation_response = """
+def test_parse_scored_evaluation_response_7(score_evaluator):
+    evaluation_response = """
 1. **Accuracy (Score 1-5):** 2  
    **Justification:** The output does not accurately fulfill the requirement of selecting an arrangement for the stem of the flower. The chosen characters (🌱🌾) do not represent a typical flower stem.
 
@@ -296,16 +296,16 @@ def test_parse_scored_validation_response_7(score_validator):
 - Provide additional context or a brief description to clarify how the chosen characters relate to the flower stem.
 - Ensure that the output aligns with any established conventions from previous subtasks regarding flower representations.
     """
-    decision, total_score, scores = score_validator.parse_scored_validation_response(
-        validation_response
+    decision, total_score, scores = score_evaluator.parse_scored_evaluation_response(
+        evaluation_response
     )
     assert decision in ("Accept Output", "Rerun Subtask")
     assert total_score == 23
     assert len(scores) is 8
 
 
-def test_parse_scored_validation_response_8(score_validator):
-    validation_response = """
+def test_parse_scored_evaluation_response_8(score_evaluator):
+    evaluation_response = """
 1. **Accuracy (Score 1-5)**: 5  
    **Justification:** The output accurately selects computer emoji characters to represent the body and torso of the dragon as specified in the subtask.
 
@@ -336,8 +336,8 @@ def test_parse_scored_validation_response_8(score_validator):
 
 The total score is above 35, and no criterion scored below 3. The output meets all the requirements effectively.
     """
-    decision, total_score, scores = score_validator.parse_scored_validation_response(
-        validation_response
+    decision, total_score, scores = score_evaluator.parse_scored_evaluation_response(
+        evaluation_response
     )
     assert decision in ("Accept Output", "Rerun Subtask")
     assert total_score == 40

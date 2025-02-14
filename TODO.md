@@ -1,21 +1,18 @@
 # TODO
-- pass parent task for all step execution
-- fix background used in planner
-- validation add execution history
+
+### Feature
+- pass parent task for all step execution (done)
+- fix background used in planner (done)
+- validation add execution history (done)
 - compatible with autogen and langgraph
-- expose generic planner prompt from graph planner
-- add R2D2 in readme
-- add FAQ section
-- read me for each example
-- change context by step
-- how to debug in the library?
+- expose generic planner prompt from graph planner (done)
+- change context by step  (done?)
 - validation retry in generic planner
-- change validator to evaluator
-- abstract validtor base, unique output return
-- adjust planner pronpt to use tool better
+- change validator to evaluator (done)
+- abstract validator base, unique output return (done)
+- adjust planner prompt to use tool better (done)
 - more unit testing
-- knowledge graph to collect sufficient informaiton
-- UI interaction
+- knowledge graph to collect sufficient information
 - bug
 ```json
 {
@@ -27,10 +24,22 @@
 }
 ```
 
+### Test
+- unit testing
+- 
+### UI
+- UI interaction
+
+### Doc
+- read me for each example
+- how to debug in the library?
+- add R2D2 in readme
+- add FAQ section
+
 # Completed
 - generic model creation and config
 - stream processing for each step during the execution
-- step validator by category, support costomized
+- step validator by category, support customized
 - history planning experience for improving
-- successful geratation rate
+- successful generation rate
 - put example in another project

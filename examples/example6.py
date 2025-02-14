@@ -68,7 +68,7 @@ def get_log(
 
 @tool("trace")
 def get_trace(trace_id: Annotated[str, "trace id"]) -> List:
-    """Get trace data from jaeger by trace id"""
+    """Get trace data by trace id"""
     return [
         {
             "eventId": 10000,
