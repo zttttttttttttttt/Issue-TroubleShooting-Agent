@@ -34,7 +34,10 @@ class Step:
 
 class Steps:
 
-    steps: List[Step] = []
+    steps: List[Step]
+
+    def __init__(self):
+        self.steps = []
 
     def __str__(self):
         return self.execution_history_to_str()

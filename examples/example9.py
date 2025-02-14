@@ -2,29 +2,29 @@
 
 from agent_core.agents import Agent
 from agent_core.planners import GenericPlanner
-from agent_core.validators.score_validator import ScoreValidator
+from agent_core.evaluator.generic_evaluator import GenericEvaluator
 
 
 def main():
     """
     Demonstrates how to override default prompts for:
-    1) Validator (ScoreValidator)
+    1) evaluator (Scoreevaluator)
     2) Agent single-step execution
     3) Planner multistep prompt
     4) Agent's final summary prompt
 
-    These overrides only apply to the current instances of validator, agent, and planner.
+    These overrides only apply to the current instances of evaluator, agent, and planner.
     Once a new object is created, it will revert to the default prompt.
     """
 
-    # --- 1) OVERRIDE ScoreValidator Prompt ----------------------------------
-    validator = ScoreValidator()
-    # Print current default validator prompt
-    print("Default Validator Prompt:\n", validator.prompt)
+    # --- 1) OVERRIDE Scoreevaluator Prompt ----------------------------------
+    evaluator = GenericEvaluator()
+    # Print current default evaluator prompt
+    print("Default evaluator Prompt:\n", evaluator.prompt)
 
     # Replace it with a grammar-focused prompt; note the placeholders {request} and {response} must remain
-    validator.prompt = """\
-    You are a special validator focusing on only grammar correctness.
+    evaluator.prompt = """\
+    You are a special evaluator focusing on only grammar correctness.
     Subtask: {request}
     Output: {response}
     Please check grammar only.

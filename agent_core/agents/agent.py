@@ -1,20 +1,15 @@
-import os
 from typing import Optional, List
 
 from langchain_core.tools import BaseTool
-
+from agent_core.agent_model import AgentModel
 from agent_core.entities.steps import Steps, Step
-from agent_core.models.base_model import BaseModel
 from agent_core.planners.base_planner import BasePlanner
-from agent_core.validators.validators import get_validators
-from agent_core.validators.base_validator import BaseValidator
-from agent_core.models.model_registry import ModelRegistry
-from agent_core.utils.logger import get_logger
-from agent_core.utils.context_manager import get_context
-from agent_core.utils.llm_chat import LLMChat
+from agent_core.utils.context_manager import ContextManager
+from agent_core.evaluator.evaluators import get_evaluator
+from agent_core.evaluator.base_evaluator import BaseEvaluator
 
 
-class Agent:
+class Agent(AgentModel):
     """
     The Agent coordinates task execution with or without a Planner.
     It now exposes two prompts:
@@ -24,7 +19,9 @@ class Agent:
 
     DEFAULT_EXECUTE_PROMPT = """
 {context_section}
+<Background>
 {background}
+</Background>
 <Task> 
 {task}
 </Task>
@@ -42,19 +39,17 @@ Execution History:
 Summary:
 """
 
-    def __init__(self, model_name: Optional[str] = None,
-                 log_level: Optional[str] = None):
+    def __init__(self, model_name: Optional[str] = None, log_level: Optional[str] = None):
         """
         If 'model' is not provided, the default model from config will be used.
         'log_level' can override the framework-wide default for this Agent specifically.
         """
 
         # This list holds execution data for each step in sequence.
-        self._execution_history: Steps = Steps()
-        self._model: Optional[BaseModel] = None
-        self._model_name: Optional[str] = None
+        super().__init__(self.__class__.__name__, model_name, log_level)
 
-        self.logger = get_logger("agent", log_level)
+        self._execution_history: Steps = Steps()
+
         self.planner = None
         self.tools: Optional[List[BaseTool]] = None
 
@@ -63,22 +58,17 @@ Summary:
         self.background = ""  # Used during execution steps
 
         # The context manager (use get_context())
-        self.context = get_context()
+        self.context = ContextManager()
 
         # Prompt strings for direct (no-planner) usage and summary
         self.execute_prompt = self.DEFAULT_EXECUTE_PROMPT
         self.summary_prompt = self.DEFAULT_SUMMARY_PROMPT
 
-        # Use the property setter to initialize the model
-        self.model_name = model_name if model_name else os.getenv("DEFAULT_MODEL")
+        # NEW: evaluator management
+        self.evaluators_enabled = False
+        self.evaluators = {}
+        self._load_default_evaluators()
 
-        # NEW: Validator management
-        self.validators_enabled = False
-        self.validators = {}
-        self._load_default_validators()
-
-        # Provide an LLM tool instance so user can do `agent.llm_chat.process(...)`
-        self.llm_chat = LLMChat(self.model_name, log_level)
         self.logger.info("Agent instance created.")
 
     def execute(self, task: str):
@@ -87,35 +77,19 @@ Summary:
         2) If planner, plan(...) -> then call execute_plan(...).
         """
         self.logger.info(f"Agent is executing task: {task}")
+        self.context.add_context("Requirement", task)
 
         # Case 1: No planner => direct single-step
         if not self.planner:
-            # Possibly build a context_section from the context
-            context_section = self.context.context_to_str()
-            final_prompt = self.execute_prompt.format(
-                context_section=context_section,
-                background=background_format(self.background),
-                task=task,
-            )
-            response = self._model.process(final_prompt)
-            self.logger.info(f"Response: {response}")
-            self._execution_history.add_step(
-                Step(
-                    name="Direct Task Execution",
-                    description=task,
-                    result=str(response)
-                )
-            )
-            return response
+            return self.execute_without_planner(task)
 
         # Case 2: Using a planner => first create steps/graph
-        current_categories = list(self.validators.keys())
+        current_categories = list(self.evaluators.keys())
         plan = self.planner.plan(
             task,
             self.tools,
-            execute_history=self._execution_history,
             knowledge=self.knowledge,
-            background=background_format(self.background),
+            background=self.background,
             categories=current_categories,
         )
 
@@ -125,10 +99,27 @@ Summary:
             execution_history=self._execution_history,
             context_manager=self.context,
             background=self.background,
-            validators_enabled=self.validators_enabled,
-            validators=self.validators,
-            llm_chat=self.llm_chat
+            evaluators_enabled=self.evaluators_enabled,
+            evaluators=self.evaluators,
         )
+
+    def execute_without_planner(self, task: str):
+        context_section = self.context.context_to_str()
+        final_prompt = self.execute_prompt.format(
+            context_section=context_section,
+            background=self.background,
+            task=task,
+        )
+        response = self._model.process(final_prompt)
+        self.logger.info(f"Response: {response}")
+        self._execution_history.add_step(
+            Step(
+                name="Direct Task Execution",
+                description=task,
+                result=str(response)
+            )
+        )
+        return response
 
     def get_execution_result_summary(self) -> str:
         """
@@ -157,16 +148,6 @@ Summary:
         self.logger.info(f"Agent planner set to: {planner.__class__.__name__}")
 
     @property
-    def model_name(self):
-        return self._model_name
-
-    @model_name.setter
-    def model_name(self, model_name: str):
-        self._model_name = model_name
-        self._model = ModelRegistry.get_model(model_name)
-        self.logger.info(f"Agent model set to: {model_name}")
-
-    @property
     def execution_history(self) -> Steps:
         """
         Read-only access to the execution history.
@@ -174,17 +155,13 @@ Summary:
         """
         return self._execution_history
 
-    @execution_history.setter
-    def execution_history(self, value):
-        raise AttributeError("Cannot modify read-only attribute.")
+    def enable_evaluators(self):
+        self.evaluators_enabled = True
+        self.logger.info("evaluators have been enabled.")
 
-    def enable_validators(self):
-        self.validators_enabled = True
-        self.logger.info("Validators have been enabled.")
-
-    def disable_validators(self):
-        self.validators_enabled = False
-        self.logger.info("Validators have been disabled.")
+    def disable_evaluators(self):
+        self.evaluators_enabled = False
+        self.logger.info("evaluators have been disabled.")
 
     @property
     def execution_responses(self) -> str:
@@ -194,36 +171,29 @@ Summary:
         """
         return self._execution_history.execution_history_to_responses()
 
-    def _load_default_validators(self):
+    def _load_default_evaluators(self):
         """
-        Load a default mapping of category -> validator (all referencing the current model).
+        Load a default mapping of category -> evaluator (all referencing the current model).
         Make a local copy so user modifications won't affect the original file.
         """
-        validators = get_validators(self._model)
-        self.validators = dict(validators)
+        evaluators = get_evaluator(self.model_name)
+        self.evaluators = dict(evaluators)
 
-    def add_validator(self, category: str, validator: BaseValidator):
+    def add_evaluator(self, category: str, evaluator: BaseEvaluator):
         """
-        Insert or override a validator for the given category.
+        Insert or override a evaluator for the given category.
         """
-        self.validators[category] = validator
+        self.evaluators[category] = evaluator
 
-    def update_validator(self, category: str, validator: BaseValidator):
+    def update_evaluator(self, category: str, evaluator: BaseEvaluator):
         """
-        Update the validator for an existing category.
+        Update the evaluator for an existing category.
         If the category doesn't exist, we log a warning and add it.
         """
-        if category in self.validators.keys():
-            self.validators[category] = validator
+        if category in self.evaluators.keys():
+            self.evaluators[category] = evaluator
         else:
             self.logger.warning(
-                f"Category '{category}' not found in validators. Creating new entry."
+                f"Category '{category}' not found in evaluator. Creating new entry."
             )
-            self.validators[category] = validator
-
-
-def background_format(background: str):
-    background_str = ""
-    if background != "":
-        background_str = f"<Background>\n{background}\n</Background>\n"
-    return background_str
+            self.evaluators[category] = evaluator

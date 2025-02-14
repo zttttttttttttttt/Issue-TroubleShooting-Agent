@@ -1,11 +1,11 @@
 # PhAENix - Single LLM Agent Development Framework
 
-PhAENix is an advanced, developer-friendly framework for building **single reliable LLM-based autonomous agents**, integrating **task planning**, **validation**, and **execution** into a seamless workflow. It abstracts complex aspects such as prompt engineering, multi-model coordination, and operational flow management—enabling developers to create powerful agents without being overwhelmed by technical intricacies. With a flexible design, PhAENix supports a wide range of use cases while allowing fine-grained control over each component.
+PhAENix is an advanced, developer-friendly framework for building **single reliable LLM-based autonomous agents**, integrating **task planning**, **evaluation**, and **execution** into a seamless workflow. It abstracts complex aspects such as prompt engineering, multi-model coordination, and operational flow management—enabling developers to create powerful agents without being overwhelmed by technical intricacies. With a flexible design, PhAENix supports a wide range of use cases while allowing fine-grained control over each component.
 
-- **Developer-Friendly**: By hiding most of the underlying complexity, this framework makes it straightforward for developers to specify high-level goals such as planning steps and configuring validation without worrying about convoluted implementation details.
+- **Developer-Friendly**: By hiding most of the underlying complexity, this framework makes it straightforward for developers to specify high-level goals such as planning steps and configuring evaluation without worrying about convoluted implementation details.
 - **Planner Variety**: The framework offers flexible planning options, including step-based planners like GenericPlanner and more complex node-graph planners like GraphPlanner, ensuring that both simple and intricate workflows are supported seamlessly.
-- **Validation Architecture**: It includes a robust validation system that checks outputs at every step, allowing errors to be detected early. This iterative validation significantly enhances overall accuracy by ensuring that tasks are iteratively refined or dynamically adjusted.
-- **Custom Configuration**: Users can adjust the framework to use different LLM models for different components—such as planning, validation, or execution—allowing precise control over the agent's behavior. Additionally, customizing prompts for each module allows for specific and tailored interactions at each stage.
+- **evaluation Architecture**: It includes a robust evaluation system that checks outputs at every step, allowing errors to be detected early. This iterative evaluation significantly enhances overall accuracy by ensuring that tasks are iteratively refined or dynamically adjusted.
+- **Custom Configuration**: Users can adjust the framework to use different LLM models for different components—such as planning, evaluation, or execution—allowing precise control over the agent's behavior. Additionally, customizing prompts for each module allows for specific and tailored interactions at each stage.
 - **Tool & Ul Integration**: The framework supports dynamic tool use and integration with external APls. Developers can call functions, engage in real-time interactions, or retrieve live data as part of the agent's workflow, enabling interactive scenarios and adaptive behavior.
 
 In summary, this LLM agent framework offers the perfect balance between abstraction and customization, empowering developers to create powerful, intelligent agents with minimal effort while ensuring flexibility and precision in every step.
@@ -25,7 +25,7 @@ PhAENix seamlessly integrates the mythical rebirth of the Phoenix with the LLM A
 
 1. [Key Innovation Features](#key-innovation-features)
    - [Replan](#replan)
-   - [Step Validation](#step-validation)
+   - [Step evaluation](#step-evaluation)
    - [Percise Context Control](#percise-context-control)
 2. [Comparison with Other Frameworks](#comparison-with-other-frameworks)
 3. [Installation](#installation)
@@ -41,7 +41,7 @@ Below are some notable innovation highlights that set PhAENix apart. You can fur
 A concise description or tagline.  
 _(Add more detailed explanations or images here.)_
 
-### Step Validation
+### Step evaluation
 
 A concise description or tagline.  
 _(Add more detailed explanations or images here.)_
@@ -59,7 +59,7 @@ Below is a report comparing PhAENix with two other notable frameworks, **autogen
 | ------------------------------------- | ------------------ | ------------ | ------------- |
 | **Developer-Friendliness**            | ⭐️⭐️⭐️⭐️⭐️    | ⭐️⭐️⭐️⭐️ | ⭐️⭐️⭐️     |
 | **Planner Variety (Step/Graph)**      | Yes (Multiple)     | Partial/Yes? | Partial/No?   |
-| **Iterative Validation Architecture** | Yes (Core Feature) | Yes/No?      | Yes/No?       |
+| **Iterative evaluation Architecture** | Yes (Core Feature) | Yes/No?      | Yes/No?       |
 | **Customizable LLM & Prompts**        | Fully Modular      | Yes/No?      | Yes/No?       |
 | **Tool & UI Integration**             | Native Support     | Limited/No?  | Limited/No?   |
 
@@ -101,7 +101,7 @@ This will make the agents, planners, models, etc. available in your Python envir
 For a comprehensive set of examples demonstrating how to use PhAENix in various scenarios, please visit our **[agent-examples repository](https://github.com/lukewu8023/agent-examples)**. There you will find **detailed examples** that show how to:
 
 - Integrate different planners ([Example 1](#))
-- Configure and customize validation loops ([Example 2](#))
+- Configure and customize evaluation loops ([Example 2](#))
 - Set up multiple LLMs for specific subtasks ([Example 3](#))
 
 ---

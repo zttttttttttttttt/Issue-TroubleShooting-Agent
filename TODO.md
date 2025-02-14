@@ -1,21 +1,17 @@
 # TODO
-- knowledge graph to collect sufficient informaiton
-- UI interaction
-- change context by step
+
+### Feature
+- knowledge graph to collect sufficient information
+- change context by step  (done?)
 - validation retry in generic planner
-- change validator to evaluator
-- generic model creation and config
-- read me for each example
-- unit testing
-- fix background used in planner
-- expose generic planner prompt from graph planner
-- how to debug in the library?
-- validation add execution history
-- abstract validtor base, unique output return
-- pass parent task for all step execution
-- adjust planner pronpt to use tool better
-- add R2D2 in readme
-- add FAQ section
+- change validator to evaluator (done)
+- generic model creation and config (done)
+- fix background used in planner (done)
+- expose generic planner prompt from graph planner (done)
+- validation add execution history (done)
+- abstract validator base, unique output return  (done)
+- pass parent task for all step execution  (done)
+- adjust planner prompt to use tool better  (done)
 - bug
 ```json
 {
@@ -26,6 +22,18 @@
      "max_attempts": 3
 }
 ```
+
+### Test
+- unit testing
+- 
+### UI
+- UI interaction
+
+### Doc
+- read me for each example
+- how to debug in the library?
+- add R2D2 in readme
+- add FAQ section
 
 # Completed
 - stream processing for each step during the execution

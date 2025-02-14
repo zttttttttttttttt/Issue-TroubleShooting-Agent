@@ -6,10 +6,9 @@ from agent_core.utils.logger import get_logger
 
 class ContextManager:
 
-    logger = get_logger("context manager")
-
     def __init__(self):
         self.context = {}
+        self.logger = get_logger(self.__class__.__name__)
 
     def get_context(self):
         """Return the underlying dictionary (if needed)."""
@@ -136,10 +135,3 @@ class ContextManager:
             if start_range <= base_id <= end_range:
                 nodes_to_remove.append(node_name)
         return nodes_to_remove
-
-
-def get_context():
-    """
-    Return a new Context instance.
-    """
-    return ContextManager()

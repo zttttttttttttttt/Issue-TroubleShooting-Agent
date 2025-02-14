@@ -1,88 +1,18 @@
 # planners/graph_planner.py
 
-import os
 import json
 from datetime import datetime
-from dataclasses import dataclass, field
 from typing import List, Dict, Optional
-
 from langchain_core.tools import BaseTool
 
-from .base_planner import BasePlanner
-from .generic_planner import GenericPlanner, Step
+from agent_core.evaluator.base_evaluator import BaseEvaluator
+from agent_core.evaluator.entities.evaluator_result import EvaluatorResult
+from agent_core.planners.base_planner import BasePlanner
+from agent_core.planners.generic_planner import GenericPlanner, Step
 from agent_core.models.model_registry import ModelRegistry
-from agent_core.utils.logger import get_logger
+from agent_core.planners.graph.graph import PlanGraph, Node, ExecutionResult
 from agent_core.utils.context_manager import ContextManager
-from agent_core.utils.llm_chat import LLMChat
-from ..entities.steps import Steps
-
-
-@dataclass
-class ExecutionResult:
-    output: str
-    validation_score: float
-    timestamp: datetime
-
-
-@dataclass
-class ReplanHistory:
-    history: List[Dict] = field(default_factory=list)
-
-    def add_record(self, record: Dict):
-        self.history.append(record)
-
-
-@dataclass
-class Node:
-    """
-    Represents a single node in the PlanGraph.
-    """
-
-    id: str
-    task_description: str
-    next_nodes: List[str] = field(default_factory=list)
-
-    task_use_tool: bool = False
-    task_tool_name: str = ""
-    task_tool: BaseTool = None
-
-    execution_results: List[ExecutionResult] = field(default_factory=list)
-    validation_threshold: float = 0.9
-    max_attempts: int = 3
-    current_attempts: int = 0
-    failed_reasons: List[str] = field(default_factory=list)
-
-    task_category: str = "default"
-
-    def set_next_node(self, node: "Node"):
-        if node.id not in self.next_nodes:
-            self.next_nodes.append(node.id)
-
-
-@dataclass
-class PlanGraph:
-    """
-    Holds multiple Node objects in a directed structure.
-    Node-based plan execution with possible replan logic.
-    """
-
-    logger = get_logger("plan-graph")
-
-    nodes: Dict[str, Node] = field(default_factory=dict)
-    start_node_id: Optional[str] = None
-    replan_history: ReplanHistory = field(default_factory=ReplanHistory)
-    current_node_id: Optional[str] = None
-
-    def add_node(self, node: Node):
-        self.nodes[node.id] = node
-        if self.start_node_id is None:
-            self.start_node_id = node.id
-
-    def summarize_plan(self) -> str:
-        summary = ""
-        for n in self.nodes.values():
-            summary += f"Node {n.id}: {n.task_description}, Next: {n.next_nodes}\n"
-        return summary
+from agent_core.entities.steps import Steps
 
 
 class GraphPlanner(BasePlanner):
@@ -164,7 +94,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
             "id": "unique_task_id",
             "task_description": "Description of the subtask",
             "next_nodes": ["next_node_id_1", "next_node_id_2"],
-            "validation_threshold": 0.9,
+            "evaluation_threshold": 0.9,
             "max_attempts": 3
         }}
     ],
@@ -174,7 +104,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
             "node_id": "node_to_modify_id",
             "task_description": "Modified description",
             "next_nodes": ["next_node_id_1", "next_node_id_2"],
-            "validation_threshold": 0.9,
+            "evaluation_threshold": 0.9,
             "max_attempts": 3
         }}
     ],
@@ -184,19 +114,11 @@ You are an intelligent assistant helping to adjust a task execution plan represe
 **Note:** Ensure your response is valid JSON, without any additional text or comments.
 """
 
-    def __init__(
-        self,
-        model_name: str = None,
-        log_level: Optional[str] = None,
-    ):
-        self.logger = get_logger("graph-planner", log_level)
-        self.model_name = model_name if model_name else os.getenv("DEFAULT_MODEL")
-        self.model = ModelRegistry.get_model(self.model_name)
-        self.logger.info(f"GraphPlanner initialized with model: {self.model.name}")
-
+    def __init__(self, model_name: str = None,
+                 log_level: Optional[str] = None):
+        super().__init__(model_name, log_level)
         self.plan_graph: Optional[PlanGraph] = None
         self.context_manager = ContextManager()
-        self._background = ""  # We'll store background for node execution
 
         self._replan_prompt = self.DEFAULT_REPLAN_PROMPT
         self._execute_prompt = self.DEFAULT_EXECUTE_PROMPT
@@ -223,10 +145,9 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         self,
         task: str,
         tools: Optional[List[BaseTool]],
-        execute_history: Steps,
         knowledge: str = "",
         background: str = "",
-        categories: Optional[List[str]] = None,
+        categories: Optional[List[str]] = None
     ) -> Steps:
         """
         1) Call GenericPlanner to obtain a list of Steps using the same arguments.
@@ -237,17 +158,16 @@ You are an intelligent assistant helping to adjust a task execution plan represe
 
         # Use GenericPlanner internally to get the steps
         generic_planner = GenericPlanner(model_name=self.model_name, log_level=None)
+        generic_planner.prompt = self.prompt
         plan = generic_planner.plan(
             task=task,
             tools=tools,
-            execute_history=execute_history,
             knowledge=knowledge,
             background=background,
             categories=categories,
         )
 
         # Convert Steps -> Node objects in a new PlanGraph
-        self._background = background
         plan_graph = PlanGraph()
 
         plan_graph.prompt = self._replan_prompt  # If needed for replan calls
@@ -284,9 +204,8 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         self,
         plan: Steps,
         execution_history: Steps,
-        validators_enabled: bool,
-        validators: dict,
-        llm_chat: LLMChat,
+        evaluators_enabled: bool,
+        evaluators: dict,
         context_manager=None,
         background: str = "",
     ):
@@ -296,10 +215,9 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         This signature is here for consistency with the BasePlanner interface.
         """
         if not self.plan_graph:
-            self.logger.error("No plan_graph found. Did you call plan() first?")
+            self.logger.error("No plan graph found. Need to generate plan graph by plan() first.")
             return
 
-        self._background = background
         if context_manager:
             self.context_manager = context_manager
 
@@ -313,11 +231,11 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                 break
 
             node = pg.nodes[pg.current_node_id]
-            result = self._execute_node(node, self.model_name)
-            score, details = self._validate_node(node, result, validators_enabled, validators)
-            self.logger.info(f"Node {node.id} execution score: {score}")
+            response = self._execute_node(node, self.model_name, background)
+            execution_result, details = self._evaluate_node(node, response, evaluators_enabled, evaluators, context_manager)
+            self.logger.info(f"Node {node.id} execution score: {execution_result.evaluation_score}")
 
-            if score >= node.validation_threshold:
+            if execution_result.evaluation_score >= node.evaluation_threshold:
                 if self.context_manager:
                     self.context_manager.remove_context(
                         f"Previous Step {node.id} Failed Attempt 1"
@@ -326,13 +244,17 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                         f"Previous Step {node.id} Failed Attempt 2"
                     )
 
-                node.result = result
+                node.result = response
                 execution_history.add_step(
                     Step(
                         name=node.id,
                         description=node.task_description,
-                        result=str(result)
+                        result=str(response)
                     )
+                )
+                context_manager.add_context(
+                    "Execution History",
+                    execution_history.execution_history_to_str(),
                 )
                 if node.next_nodes:
                     pg.current_node_id = node.next_nodes[0]
@@ -344,7 +266,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                     self.logger.warning(f"Replanning needed at Node {node.id}")
                     failure_info = self.prepare_failure_info(node)
                     replan_response = self.call_llm_for_replan(pg, failure_info)
-                    adjustments = llm_chat.parse_llm_response(
+                    adjustments = self.parse_llm_response(
                         replan_response
                     )
                     if adjustments:
@@ -388,7 +310,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                         self.context_manager.add_context(
                             key,
                             f"""
-Task response: {result}
+Task response: {response}
 Task critic details: {details}
                         """,
                         )
@@ -396,7 +318,7 @@ Task critic details: {details}
                     continue
         return "Task execution completed using GraphPlanner."
 
-    def _execute_node(self, node: Node, model_name: str) -> str:
+    def _execute_node(self, node: Node, model_name: str, background: str) -> str:
         """
         Build prompt + call the LLM. If 'use_tool', invoke the tool.
         """
@@ -419,10 +341,8 @@ Task critic details: {details}
 
         # Node doesn't store a custom prompt, so we use self._execute_prompt
         final_prompt = self._execute_prompt.format(
-            context=(
-                self.context_manager.context_to_str() if self.context_manager else ""
-            ),
-            background=self._background,
+            context=self.context_manager.context_to_str(),
+            background=background,
             task_description=f"<Step {node.id}>\nTask Desc: {node.task_description}\n</Step {node.id}>",
             task_use_tool=node.task_use_tool,
             tool_description=tool_description,
@@ -465,45 +385,40 @@ Task response: {response}
         self.logger.info(f"Response: {response}")
         return response
 
-    def _validate_node(self, node: Node, result: str, validators_enabled: bool, validators: dict):
+    def _evaluate_node(self, node: Node, result: str, evaluators_enabled: bool,
+                       evaluators: Dict[str, BaseEvaluator], context_manager: ContextManager):
         """
-        Validate the node output using agent's validator if enabled.
+        evaluate the node output using agent's evaluator if enabled.
         Return 0..1 scale.
         """
-        if not validators_enabled:
-            # Validation is disabled; treat as success
+        if not evaluators_enabled:
             execution_result = ExecutionResult(
-                output=result, validation_score=1.0, timestamp=datetime.now()
+                output=result, evaluation_score=1.0, timestamp=datetime.now()
             )
             node.execution_results.append(execution_result)
-            return 1.0, ''
+            return execution_result, ""
 
         chosen_cat = (
-            node.task_category if node.task_category in validators else "default"
+            node.task_category if node.task_category in evaluators else "default"
         )
-        validator = validators.get(chosen_cat)
-        if not validator:
+        evaluator = evaluators.get(chosen_cat)
+        if not evaluator:
             self.logger.warning(
-                f"No validator found for category '{chosen_cat}'. Validation skipped."
+                f"No evaluator found for category '{chosen_cat}'. evaluation skipped."
             )
             execution_result = ExecutionResult(
-                output=result, validation_score=1.0, timestamp=datetime.now()
+                output=result, evaluation_score=1.0, timestamp=datetime.now()
             )
             node.execution_results.append(execution_result)
-            return 1.0
+            return execution_result
 
-        decision, score, details = validator.validate(node.task_description, result)
-        numeric_score = float(score) / 40.0
-        # if decision == "Rerun Subtask":
-        #     numeric_score = 0.0
-        # else:
-        #     numeric_score = float(score) / 40.0
-
+        evaluator_result = evaluator.evaluate(node.task_description, result, context_manager)
+        numeric_score = float(evaluator_result.score) / 40.0
         execution_result = ExecutionResult(
-            output=result, validation_score=numeric_score, timestamp=datetime.now()
+            output=result, evaluation_score=numeric_score, timestamp=datetime.now()
         )
         node.execution_results.append(execution_result)
-        return numeric_score, details
+        return execution_result, evaluator_result.details
 
     def _should_replan(self, node: Node) -> bool:
         """
@@ -513,11 +428,11 @@ Task response: {response}
             return False
         last_entry = node.execution_results[-1]
         if isinstance(last_entry, ExecutionResult):
-            last_score = last_entry.validation_score
+            last_score = last_entry.evaluation_score
         else:
             return False
 
-        if last_score >= node.validation_threshold:
+        if last_score >= node.evaluation_threshold:
             return False
         elif node.current_attempts >= node.max_attempts:
             failure_reason = (
@@ -540,7 +455,7 @@ Task response: {response}
                 {
                     "node_id": n.id,
                     "results": [
-                        er.validation_score if isinstance(er, ExecutionResult) else None
+                        er.evaluation_score if isinstance(er, ExecutionResult) else None
                         for er in n.execution_results
                     ],
                 }
@@ -565,7 +480,7 @@ Task response: {response}
         )
 
         self.logger.info("Calling model for replan instructions...")
-        response = self.model.process(final_prompt)
+        response = self._model.process(final_prompt)
         self.logger.info(f"Replan response: {response}")
         return response
 
@@ -655,7 +570,7 @@ def apply_adjustments_to_plan(
                 id=new_subtask_id,
                 task_description=st.get("task_description", "No description provided."),
                 next_nodes=st.get("next_nodes", []),
-                validation_threshold=st.get("validation_threshold", 0.9),
+                evaluation_threshold=st.get("evaluation_threshold", 0.9),
                 max_attempts=st.get("max_attempts", 3),
                 task_category=st.get("step_category", "default"),
             )
@@ -692,8 +607,8 @@ def apply_adjustments_to_plan(
                     "task_description", node.task_description
                 )
                 node.next_nodes = mod.get("next_nodes", node.next_nodes)
-                node.validation_threshold = mod.get(
-                    "validation_threshold", node.validation_threshold
+                node.evaluation_threshold = mod.get(
+                    "evaluation_threshold", node.evaluation_threshold
                 )
                 node.max_attempts = mod.get("max_attempts", node.max_attempts)
                 node.task_category = mod.get("step_category", node.task_category)
@@ -705,7 +620,7 @@ def apply_adjustments_to_plan(
                     id=mod_id,
                     task_description=new_description,
                     next_nodes=mod.get("next_nodes", []),
-                    validation_threshold=mod.get("validation_threshold", 0.9),
+                    evaluation_threshold=mod.get("evaluation_threshold", 0.9),
                     max_attempts=mod.get("max_attempts", 3),
                     task_category=mod.get("step_category", "default"),
                 )
@@ -716,7 +631,7 @@ def apply_adjustments_to_plan(
                 id=restart_node_id,
                 task_description="Automatically added restart node",
                 next_nodes=[],
-                validation_threshold=0.9,
+                evaluation_threshold=0.9,
                 max_attempts=3,
             )
             plan_graph.add_node(new_node)

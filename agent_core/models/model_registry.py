@@ -3,18 +3,16 @@
 import pkgutil
 import importlib
 import os
-
-from .base_model import BaseModel  # Updated import
+from .base_model import BaseModel
 from agent_core.utils.logger import get_logger
 
 
-def load_models_dynamically(logger):    
+def load_models_dynamically(logger):
     """
     Dynamically load and register all model classes from the models package.
     """
     package_dir = os.path.dirname(__file__)
     package_name = __package__  # Should be 'models'
-
     for _, module_name, _ in pkgutil.iter_modules([package_dir]):
         if module_name.startswith("_") or module_name in ["model_registry", "base_model"]:
             continue  # Skip private modules and model_registry itself
@@ -49,7 +47,7 @@ class ModelRegistry:
 
     @classmethod
     def load_models(cls, log_level: str = None):
-        logger = get_logger("model-loader", log_level)
+        logger = get_logger(cls.__name__, log_level)
         try:
             load_models_dynamically(logger)
         except Exception as e:
