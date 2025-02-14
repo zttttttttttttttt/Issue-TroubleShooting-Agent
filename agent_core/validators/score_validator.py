@@ -4,6 +4,7 @@ import re
 from typing import Optional
 from agent_core.utils.logger import get_logger
 from .base_validator import BaseValidator
+from agent_core.models.model_registry import ModelRegistry
 import os
 
 
