@@ -1,5 +1,13 @@
 # examples/example9.py
 
+import sys
+import os
+
+# Add the parent directory to sys.path to allow imports from the framework
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+
 from agent_core.agents import Agent
 from agent_core.planners import GenericPlanner
 from agent_core.evaluator.generic_evaluator import GenericEvaluator
@@ -54,11 +62,47 @@ def main():
     # Override the planner's prompt to produce exactly two steps in JSON
     # Placeholders typically include: {task}, {tools_knowledge}, {knowledge}, {example_json1}, {example_json2}.
     planner.prompt = """\
-    I only want two simple steps:
-    Task: {task}
-    Tools: {tools_knowledge}
-    Output JSON with two main steps.
-    Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name', and 'step_category'.
+    Given the following task and the tools, generate a high-level plan by breaking it down into meaningful, actionable steps.
+
+    **Instructions for generating 'use_tool':**
+    If the <Tools></Tools> section is empty, set "use_tool" to false for all steps and omit "tool_name."
+    If the <Tools></Tools> section contains tools, set "use_tool" to true when a tool is necessary. Include "tool_name" in those steps and reference any tool-specific properties or arguments in the description.
+
+    **Task Breakdown Requirements:**
+    1) All steps must be encapsulated under the "steps" key in valid JSON format.
+    2) Each step should include:
+        "step_name": The name of the step
+        "step_description": A concise description of the action to be performed in that step
+        "use_tool": A boolean indicating whether a tool should be used
+        Optionally, "tool_name": The name of the tool if "use_tool" is true
+        "step_category": Categorize the step based on its function ({categories_str})
+    3) The possible categories for each step are: {categories_str}.
+      If you cannot fit into any existing category, define a new category in "step_category".
+    4) Output **ONLY** valid JSON. No extra text, no Markdown.   
+    5) Steps should be high-level but clear and not missing any aspect, had better used all tools to analyse, avoiding overly detailed breakdowns for simple tasks.
+    
+    {background}
+    
+    <Knowledge>
+    {knowledge}
+    </Knowledge>
+
+    <Examples>
+    {example_json1}
+    {example_json2}
+    </Examples>
+
+    <Tools>
+    {tools_knowledge}
+    </Tools>
+
+    <Task>
+    {task}
+    </Task>
+    
+    I only want two simple steps.
+    Output ONLY valid JSON. No extra text or markdown.
+    Steps:
     """
 
     # Attach this planner to the agent
