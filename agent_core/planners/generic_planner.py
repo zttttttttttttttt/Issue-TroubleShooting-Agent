@@ -141,7 +141,7 @@ class GenericPlanner(BasePlanner):
             # Optional Evaluation
             if evaluators_enabled:
                 self.process_evaluator(
-                    task, step, evaluators, response, context_manager
+                    task, step, evaluators, response, background, context_manager
                 )
 
             # Record the step execution
@@ -160,13 +160,14 @@ class GenericPlanner(BasePlanner):
         step: Step,
         evaluators: Dict[str, BaseEvaluator],
         response: str,
+        background: str,
         context_manager: ContextManager,
     ):
         chosen_cat = step.category if step.category in evaluators else "default"
         evaluator = evaluators.get(chosen_cat)
         if evaluator:
             evaluator_result = evaluator.evaluate(
-                root_task, step.description, response, context_manager
+                root_task, step.description, response, background, context_manager
             )
             self.logger.info(
                 f"Evaluator Decision: {evaluator_result.decision}, Score: {evaluator_result.score}"

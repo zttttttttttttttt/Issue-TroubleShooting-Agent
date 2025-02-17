@@ -29,7 +29,7 @@ class BaseEvaluator(AgentBasic):
         pass
 
     @abstractmethod
-    def evaluate(self, root_task: str, request: str, response: str, context_manager: ContextManager) -> EvaluatorResult:
+    def evaluate(self, root_task: str, request: str, response: str, background: str, context_manager: ContextManager) -> EvaluatorResult:
         """
         Perform evaluator on the given request and response.
         """

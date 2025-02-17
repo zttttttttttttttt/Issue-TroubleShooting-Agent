@@ -70,6 +70,9 @@ Ensure the output is only the JSON string, with no additional characters, header
 **Context**
 {context}
 
+**Description of ultimate task goal:**
+{root_task}
+
 **Request:**
 {request}
 
@@ -87,12 +90,12 @@ Ensure the output is only the JSON string, with no additional characters, header
     ):
         super().__init__(model_name, log_level, evaluation_threshold)
 
-    def evaluate(self, request, response, context_manager) -> EvaluatorResult:
+    def evaluate(self, root_task, request, response, background, context_manager) -> EvaluatorResult:
         """
         Evaluate the provided request and generated code response.
         """
-        prompt_text = self.prompt.format(
-            request=request, response=response, context=context_manager.context_to_str()
+        prompt_text = self.prompt.format(root_task=root_task,
+            request=request, response=response, background=background, context=context_manager.context_to_str()
         )
 
         try:
