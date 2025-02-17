@@ -86,7 +86,8 @@ def main():
     agent.summary_prompt = IssueTroubleShootingSummary.ISSUE_TROUBLESHOOT_PROMPT
 
     execution_history = agent.execution_history
-    print(f"Execution History: {execution_history}")
+    # print(f"Execution History: {execution_history}")
+    print(f"Response: {agent.execution_responses}")
     execution_result = agent.get_execution_result_summary()
     print(f"Execution Summary: {execution_result}")
 
