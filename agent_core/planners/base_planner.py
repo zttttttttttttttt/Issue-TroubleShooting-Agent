@@ -2,12 +2,9 @@
 
 from abc import abstractmethod
 from typing import List, Optional
-
 from langchain_core.tools import BaseTool
-
-from agent_core.agent_model import AgentModel
+from agent_core.agent_basic import AgentModel
 from agent_core.entities.steps import Steps
-from agent_core.utils.context_manager import ContextManager
 
 
 def tool_knowledge_format(tools: Optional[List[BaseTool]]) -> str:

@@ -1,7 +1,7 @@
 from typing import Optional, List
 
 from langchain_core.tools import BaseTool
-from agent_core.agent_model import AgentModel
+from agent_core.agent_basic import AgentModel
 from agent_core.entities.steps import Steps, Step
 from agent_core.planners.base_planner import BasePlanner
 from agent_core.utils.context_manager import ContextManager
@@ -77,7 +77,6 @@ Summary:
         2) If planner, plan(...) -> then call execute_plan(...).
         """
         self.logger.info(f"Agent is executing task: {task}")
-        self.context.add_context("Requirement", task)
 
         # Case 1: No planner => direct single-step
         if not self.planner:
@@ -86,8 +85,8 @@ Summary:
         # Case 2: Using a planner => first create steps/graph
         current_categories = list(self.evaluators.keys())
         plan = self.planner.plan(
-            task,
-            self.tools,
+            task=task,
+            tools=self.tools,
             knowledge=self.knowledge,
             background=self.background,
             categories=current_categories,
@@ -95,6 +94,7 @@ Summary:
 
         # Now just call planner's execute_plan(...) in a unified way
         return self.planner.execute_plan(
+            task=task,
             plan=plan,
             execution_history=self._execution_history,
             context_manager=self.context,
