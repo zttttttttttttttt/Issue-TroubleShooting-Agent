@@ -1,6 +1,8 @@
 # planners/graph_planner.py
 
 import json
+import re
+
 from agent_core.evaluators import BaseEvaluator
 from agent_core.planners.base_planner import BasePlanner
 from agent_core.planners.generic_planner import GenericPlanner, Step
@@ -302,7 +304,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         execution_history: Steps,
         evaluators_enabled: bool,
         evaluators: dict,
-        context_manager=None,
+        context_manager: ContextManager =None,
         background: str = "",
     ):
         """
@@ -333,13 +335,10 @@ You are an intelligent assistant helping to adjust a task execution plan represe
 
             if execution_result.evaluation_score >= node.evaluation_threshold:
                 if self.context_manager:
-                    self.context_manager.remove_context(
-                        f"Previous Step {node.id} Failed Attempt 1"
-                    )
-                    self.context_manager.remove_context(
-                        f"Previous Step {node.id} Failed Attempt 2"
-                    )
-
+                    attempt = "|".join(str(i) for i in range(node.current_attempts + 1))
+                    self.context_manager = {k: v
+                                            for k, v in self.context_manager.context.items()
+                                            if not re.match(f"Previous Step {node.id}(.([0-9])*)* Failed Attempt {attempt}?", k)}
                 node.result = response
                 execution_history.add_step(
                     Step(
