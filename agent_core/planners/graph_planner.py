@@ -1,18 +1,110 @@
 # planners/graph_planner.py
 
 import json
-from datetime import datetime
-from typing import List, Dict, Optional
-from langchain_core.tools import BaseTool
-
 from agent_core.evaluators import BaseEvaluator
-from agent_core.evaluators.entities.evaluator_result import EvaluatorResult
 from agent_core.planners.base_planner import BasePlanner
 from agent_core.planners.generic_planner import GenericPlanner, Step
 from agent_core.models.model_registry import ModelRegistry
-from agent_core.planners.graph.graph import PlanGraph, Node, ExecutionResult
 from agent_core.utils.context_manager import ContextManager
 from agent_core.entities.steps import Steps
+from datetime import datetime
+from dataclasses import dataclass, field
+from typing import List, Dict, Optional
+from langchain_core.tools import BaseTool
+
+from agent_core.utils.llm_chat import LLMChat
+from agent_core.utils.logger import get_logger
+
+
+@dataclass
+class ExecutionResult:
+    output: str
+    evaluation_score: float
+    timestamp: datetime
+
+
+@dataclass
+class ReplanHistory:
+    history: List[Dict] = field(default_factory=list)
+
+    def add_record(self, record: Dict):
+        self.history.append(record)
+
+
+@dataclass
+class Node:
+    """
+    Represents a single node in the PlanGraph.
+    """
+
+    id: str
+    task_description: str
+    next_nodes: List[str] = field(default_factory=list)
+
+    task_use_tool: bool = False
+    task_tool_name: str = ""
+    task_tool: BaseTool = None
+
+    execution_results: List[ExecutionResult] = field(default_factory=list)
+    evaluation_threshold: float = 0.9
+    max_attempts: int = 3
+    current_attempts: int = 0
+    failed_reasons: List[str] = field(default_factory=list)
+
+    task_category: str = "default"
+
+    def set_next_node(self, node: "Node"):
+        if node.id not in self.next_nodes:
+            self.next_nodes.append(node.id)
+
+
+@dataclass
+class PlanGraph:
+    """
+    Holds multiple Node objects in a directed structure.
+    Node-based plan execution with possible replan logic.
+    """
+
+    logger = get_logger("plan-graph")
+
+    nodes: Dict[str, Node] = field(default_factory=dict)
+    start_node_id: Optional[str] = None
+    replan_history: ReplanHistory = field(default_factory=ReplanHistory)
+    current_node_id: Optional[str] = None
+
+    def add_node(self, node: Node):
+        self.nodes[node.id] = node
+        if self.start_node_id is None:
+            self.start_node_id = node.id
+
+    def summarize_plan(self) -> str:
+        summary = ""
+        for n in self.nodes.values():
+            summary += f"Node {n.id}: {n.task_description}, Next: {n.next_nodes}\n"
+        return summary
+
+
+def _should_replan(node: Node) -> bool:
+    """
+    Checks if the node's last result is below threshold and attempts are exceeded.
+    """
+    if not node.execution_results:
+        return False
+    last_entry = node.execution_results[-1]
+    if isinstance(last_entry, ExecutionResult):
+        last_score = last_entry.evaluation_score
+    else:
+        return False
+
+    if last_score >= node.evaluation_threshold:
+        return False
+    elif node.current_attempts >= node.max_attempts:
+        failure_reason = (
+            f"Node {node.id} failed to reach threshold after {node.max_attempts} attempts."
+        )
+        node.failed_reasons.append(failure_reason)
+        return True
+    return False
 
 
 class GraphPlanner(BasePlanner):
@@ -32,6 +124,9 @@ class GraphPlanner(BasePlanner):
 Now, based on the above background and context, process the following task, please notice to avoid those responses in the failed attempts and take those suggestions before respond.
 
 <Task>
+<Root Task>
+{task}
+</Root Task>
 {task_description}
 </Task>
 
@@ -203,6 +298,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
     def execute_plan(
         self,
         plan: Steps,
+        task: str,
         execution_history: Steps,
         evaluators_enabled: bool,
         evaluators: dict,
@@ -231,7 +327,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                 break
 
             node = pg.nodes[pg.current_node_id]
-            response = self._execute_node(node, self.model_name, background)
+            response = self._execute_node(node, self.model_name, task, background)
             execution_result, details = self._evaluate_node(node, response, evaluators_enabled, evaluators, context_manager)
             self.logger.info(f"Node {node.id} execution score: {execution_result.evaluation_score}")
 
@@ -252,21 +348,17 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                         result=str(response)
                     )
                 )
-                context_manager.add_context(
-                    "Execution History",
-                    execution_history.execution_history_to_str(),
-                )
                 if node.next_nodes:
                     pg.current_node_id = node.next_nodes[0]
                 else:
                     self.logger.info("Plan execution completed successfully.")
                     break
             else:
-                if self._should_replan(node):
+                if _should_replan(node):
                     self.logger.warning(f"Replanning needed at Node {node.id}")
                     failure_info = self.prepare_failure_info(node)
                     replan_response = self.call_llm_for_replan(pg, failure_info)
-                    adjustments = self.parse_llm_response(
+                    adjustments = LLMChat(self.model_name, self.logger).parse_llm_response(
                         replan_response
                     )
                     if adjustments:
@@ -310,15 +402,14 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                         self.context_manager.add_context(
                             key,
                             f"""
-Task response: {response}
-Task critic details: {details}
-                        """,
+                            Task response: {response}
+                            """,
                         )
 
                     continue
         return "Task execution completed using GraphPlanner."
 
-    def _execute_node(self, node: Node, model_name: str, background: str) -> str:
+    def _execute_node(self, node: Node, model_name: str, task: str, background: str) -> str:
         """
         Build prompt + call the LLM. If 'use_tool', invoke the tool.
         """
@@ -342,6 +433,7 @@ Task critic details: {details}
         # Node doesn't store a custom prompt, so we use self._execute_prompt
         final_prompt = self._execute_prompt.format(
             context=self.context_manager.context_to_str(),
+            task=task,
             background=background,
             task_description=f"<Step {node.id}>\nTask Desc: {node.task_description}\n</Step {node.id}>",
             task_use_tool=node.task_use_tool,
@@ -419,28 +511,6 @@ Task response: {response}
         )
         node.execution_results.append(execution_result)
         return execution_result, evaluator_result.details
-
-    def _should_replan(self, node: Node) -> bool:
-        """
-        Checks if the node's last result is below threshold and attempts are exceeded.
-        """
-        if not node.execution_results:
-            return False
-        last_entry = node.execution_results[-1]
-        if isinstance(last_entry, ExecutionResult):
-            last_score = last_entry.evaluation_score
-        else:
-            return False
-
-        if last_score >= node.evaluation_threshold:
-            return False
-        elif node.current_attempts >= node.max_attempts:
-            failure_reason = (
-                f"Node {node.id} failed to reach threshold after {node.max_attempts} attempts."
-            )
-            node.failed_reasons.append(failure_reason)
-            return True
-        return False
 
     def prepare_failure_info(self, node: Node) -> Dict:
         """

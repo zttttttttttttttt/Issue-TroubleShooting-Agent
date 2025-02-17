@@ -106,6 +106,7 @@ class GenericPlanner(BasePlanner):
     def execute_plan(
         self,
         plan: Steps,
+        task: str,
         execution_history: Steps,
         evaluators_enabled: bool,
         evaluators: dict,
@@ -126,6 +127,9 @@ class GenericPlanner(BasePlanner):
                 {context_section}
                 {background_format(background)}
                 <Task>
+                <Root Task>
+                {task}
+                </Root Task>
                 {step.description}
                 </Task>
                 """

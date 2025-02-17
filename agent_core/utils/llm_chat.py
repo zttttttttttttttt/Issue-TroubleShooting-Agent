@@ -1,11 +1,11 @@
-from abc import ABC
-from typing import Optional
-import json
-from agent_core.models.base_model import BaseModel
-from agent_core.models.model_registry import ModelRegistry
-import os
 import re
+import json
+from typing import Optional
+
+from agent_core.agent_basic import AgentBasic
+from agent_core.models.model_registry import ModelRegistry
 from agent_core.utils.logger import get_logger
+import os
 
 
 def _parse_section(response_text: str, label: str) -> str:
@@ -31,52 +31,31 @@ def _parse_rating(response_text: str) -> int:
     return 1
 
 
-class AgentModel(ABC):
-
+class LLMChat(AgentBasic):
     DEFAULT_EVALUATE_TEXT_PROMPT = """\
-    You are a critical evaluator. Below is some text to evaluate:
+You are a critical evaluator. Below is some text to evaluate:
+Text:
+{input_text}
+Criteria:
+{criteria}
+Instructions:
+1) Provide a short explanation of how well the text meets the criteria.
+2) Then on a new line, output "Rating: X" where X is an integer in [1..10].
+3) Optionally provide suggestions.
+Example:
+Summary: This text partially meets the criteria but could be more clear.
+Rating: 7
+Suggestions: Make it clearer how the data is processed.
+Now, produce your evaluation:
+"""
 
-    Text:
-    {input_text}
-
-    Criteria:
-    {criteria}
-
-    Instructions:
-    1) Provide a short explanation of how well the text meets the criteria.
-    2) Then on a new line, output "Rating: X" where X is an integer in [1..10].
-    3) Optionally provide suggestions.
-
-    Example:
-    Summary: This text partially meets the criteria but could be more clear.
-    Rating: 7
-    Suggestions: Make it clearer how the data is processed.
-
-    Now, produce your evaluation:
-    """
-
-    def __init__(self, name, model_name: Optional[str] = None,
-                 log_level: Optional[str] = None):
+    def __init__(self, name, model_name: str = None, log_level: str = None):
         """
-        If 'model' is not provided, the default model from config will be used.
-        'log_level' can override the framework-wide default for this Agent specifically.
+        If model_name is None, use the default model from Config.
+        This class can be used to do both summarization and text-critique.
         """
-        self.name = name
-        self._model: Optional[BaseModel] = None
-        self._model_name: Optional[str] = None
-        self.logger = get_logger(self.__class__.__name__, log_level)
-        self.model_name = model_name if model_name else os.getenv("DEFAULT_MODEL")
+        super().__init__(name, model_name, log_level)
         self._evaluate_text_prompt = self.DEFAULT_EVALUATE_TEXT_PROMPT
-
-    @property
-    def model_name(self):
-        return self._model_name
-
-    @model_name.setter
-    def model_name(self, model_name: str):
-        self._model_name = model_name
-        self._model = ModelRegistry.get_model(model_name)
-        self.logger.info(f"{self.name} set to: {model_name}")
 
     @property
     def evaluate_text_prompt(self) -> str:
@@ -93,7 +72,7 @@ class AgentModel(ABC):
         return response.strip()
 
     def evaluate_text(
-            self, input_text: str, criteria: str = "", rating_threshold: int = 8
+        self, input_text: str, criteria: str = "", rating_threshold: int = 8
     ) -> dict:
         """
         Critique/evaluate the text using the DEFAULT_EVALUATE_TEXT_PROMPT.
@@ -103,7 +82,6 @@ class AgentModel(ABC):
           - 'summary': the extracted text around "Summary:"
           - 'suggestions': text after "Suggestions:" if found
           - 'raw_response': the entire LLM response
-
         Example usage:
             result = llm.critic_text("some plan", "Should talk about DB usage", 8)
             if result["decision"] == "Fail":
@@ -115,15 +93,12 @@ class AgentModel(ABC):
         )
         response = self._model.process(prompt)
         self.logger.debug(f"Evaluate raw response: {response}")
-
         # Parse rating from 1..10
         rating_val = _parse_rating(response)
         decision = "Pass" if rating_val >= rating_threshold else "Fail"
-
         # Optionally parse 'Summary:' and 'Suggestions:'
         summary_str = _parse_section(response, "summary")
         suggestions_str = _parse_section(response, "suggestions")
-
         return {
             "decision": decision,
             "rating": rating_val,
