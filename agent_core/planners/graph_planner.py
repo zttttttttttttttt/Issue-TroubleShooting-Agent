@@ -239,12 +239,12 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         self._execute_prompt = value
 
     def plan(
-        self,
-        task: str,
-        tools: Optional[List[BaseTool]],
-        knowledge: str = "",
-        background: str = "",
-        categories: Optional[List[str]] = None
+            self,
+            task: str,
+            tools: Optional[List[BaseTool]],
+            knowledge: str = "",
+            background: str = "",
+            categories: Optional[List[str]] = None
     ) -> Steps:
         """
         1) Call GenericPlanner to obtain a list of Steps using the same arguments.
@@ -298,14 +298,14 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         return plan
 
     def execute_plan(
-        self,
-        plan: Steps,
-        task: str,
-        execution_history: Steps,
-        evaluators_enabled: bool,
-        evaluators: dict,
-        context_manager: ContextManager =None,
-        background: str = "",
+            self,
+            plan: Steps,
+            task: str,
+            execution_history: Steps,
+            evaluators_enabled: bool,
+            evaluators: dict,
+            context_manager: ContextManager = None,
+            background: str = "",
     ):
         """
         Executes the PlanGraph node by node.
@@ -330,15 +330,16 @@ You are an intelligent assistant helping to adjust a task execution plan represe
 
             node = pg.nodes[pg.current_node_id]
             response = self._execute_node(node, self.model_name, task, background)
-            execution_result, details = self._evaluate_node(node, response, evaluators_enabled, evaluators, context_manager)
+            execution_result, details = self._evaluate_node(node, response, evaluators_enabled, evaluators,
+                                                            context_manager)
             self.logger.info(f"Node {node.id} execution score: {execution_result.evaluation_score}")
 
             if execution_result.evaluation_score >= node.evaluation_threshold:
                 if self.context_manager:
                     attempt = "|".join(str(i) for i in range(node.current_attempts + 1))
-                    self.context_manager = {k: v
-                                            for k, v in self.context_manager.context.items()
-                                            if not re.match(f"Previous Step {node.id}(.([0-9])*)* Failed Attempt {attempt}?", k)}
+                    self.context_manager.context = {k: v
+                                                    for k, v in self.context_manager.context.items()
+                                                    if not re.match(f"Previous Step {node.id}(.([0-9])*)* Failed Attempt {attempt}?", k)}
                 node.result = response
                 execution_history.add_step(
                     Step(
@@ -560,8 +561,8 @@ Task response: {response}
             restart_node_id = adjustments.get("restart_node_id")
         elif action == "breakdown":
             if (
-                adjustments.get("new_subtasks")
-                and len(adjustments.get("new_subtasks")) > 0
+                    adjustments.get("new_subtasks")
+                    and len(adjustments.get("new_subtasks")) > 0
             ):
                 restart_node_id = adjustments.get("new_subtasks")[0].get("id")
             else:
@@ -605,9 +606,9 @@ Task response: {response}
 
 
 def apply_adjustments_to_plan(
-    plan_graph: PlanGraph,
-    node_id: str,
-    adjustments: str,
+        plan_graph: PlanGraph,
+        node_id: str,
+        adjustments: str,
 ):
     action = adjustments.get("action")
 
