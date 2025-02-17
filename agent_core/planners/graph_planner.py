@@ -1,7 +1,7 @@
 # planners/graph_planner.py
 
 import json
-from agent_core.evaluator.base_evaluator import BaseEvaluator
+from agent_core.evaluators import BaseEvaluator
 from agent_core.planners.base_planner import BasePlanner
 from agent_core.planners.generic_planner import GenericPlanner, Step
 from agent_core.models.model_registry import ModelRegistry

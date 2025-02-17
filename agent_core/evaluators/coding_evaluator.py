@@ -1,3 +1,5 @@
+# evaluators/coding_evaluator.py
+
 import json
 from typing import Optional, List
 from .base_evaluator import BaseEvaluator
@@ -17,21 +19,21 @@ def generate_improvement_suggestions(scores: List[tuple]) -> str:
         "Efficiency and Performance": "Optimize algorithms and resource usage for better performance.",
         "Maintainability and Scalability": "Refactor the code to enhance maintainability and facilitate future extensions.",
         "Security and Robustness": "Implement proper error handling and security measures to cover edge cases.",
-        "Testability": "Design the code structure to facilitate unit testing and overall verification."
+        "Testability": "Design the code structure to facilitate unit testing and overall verification.",
     }
 
     suggestions = []
     for criterion, score_value in scores:
         if score_value < 3:
             suggestion = suggestion_dict.get(
-                criterion,
-                f"Consider improving {criterion}."
+                criterion, f"Consider improving {criterion}."
             )
             suggestions.append(f"- {criterion}: {suggestion}")
 
     if not suggestions:
         suggestions.append(
-            "Review the overall implementation to better meet the requirements and quality standards.")
+            "Review the overall implementation to better meet the requirements and quality standards."
+        )
 
     return "\n".join(suggestions)
 
@@ -81,7 +83,7 @@ Ensure the output is only the JSON string, with no additional characters, header
         self,
         model_name: Optional[str] = None,
         log_level: Optional[str] = None,
-        evaluation_threshold: Optional[float] = 0.8
+        evaluation_threshold: Optional[float] = 0.8,
     ):
         super().__init__(model_name, log_level, evaluation_threshold)
 
@@ -89,7 +91,9 @@ Ensure the output is only the JSON string, with no additional characters, header
         """
         Evaluate the provided request and generated code response.
         """
-        prompt_text = self.prompt.format(request=request, response=response, context=context_manager.context_to_str())
+        prompt_text = self.prompt.format(
+            request=request, response=response, context=context_manager.context_to_str()
+        )
 
         try:
             evaluation_response = self._model.process(prompt_text)
@@ -101,16 +105,18 @@ Ensure the output is only the JSON string, with no additional characters, header
                 {
                     "score_breakdown": [],
                     "raw_evaluation": "",
-                    "improvement_suggestions": "Model evaluation failed. Please try again."
-                }
+                    "improvement_suggestions": "Model evaluation failed. Please try again.",
+                },
             )
 
-        decision, total_score, scores = self.parse_scored_evaluation_response(evaluation_response)
+        decision, total_score, scores = self.parse_scored_evaluation_response(
+            evaluation_response
+        )
 
         details = {
             "score_breakdown": scores,
             "raw_evaluation": evaluation_response,
-            "total_applicable_score": total_score
+            "total_applicable_score": total_score,
         }
 
         if decision == "Reject Code":
@@ -130,7 +136,9 @@ Ensure the output is only the JSON string, with no additional characters, header
         For criteria marked as N/A, they are excluded from the score calculation.
         """
         try:
-            cleaned_evaluation_response = evaluation_response.replace("```json", "").replace("```", "").strip()
+            cleaned_evaluation_response = (
+                evaluation_response.replace("```json", "").replace("```", "").strip()
+            )
             evaluation_data = json.loads(cleaned_evaluation_response)
         except json.JSONDecodeError:
             self.logger.error("Unable to parse the model's evaluation response.")
@@ -155,7 +163,10 @@ Ensure the output is only the JSON string, with no additional characters, header
         any_low_scores = any(score < 3 for _, score in scores)
         average_score = total_score / applicable_criteria_count
 
-        decision = "Accept Code" if average_score >= (5 * self.evaluation_threshold) and not any_low_scores else "Reject Code"
+        decision = (
+            "Accept Code"
+            if average_score >= (5 * self.evaluation_threshold) and not any_low_scores
+            else "Reject Code"
+        )
 
         return decision, total_score, scores
-

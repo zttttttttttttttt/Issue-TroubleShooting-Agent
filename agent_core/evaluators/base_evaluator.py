@@ -1,9 +1,10 @@
-# evaluator/base_evaluator.py
+# evaluators/base_evaluator.py
 
 from abc import abstractmethod
 from typing import Optional
+
 from agent_core.agent_basic import AgentModel
-from agent_core.evaluator.entities.evaluator_result import EvaluatorResult
+from agent_core.evaluators.entities.evaluator_result import EvaluatorResult
 from agent_core.utils.context_manager import ContextManager
 
 

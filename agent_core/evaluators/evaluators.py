@@ -1,4 +1,5 @@
-# evaluator/evaluator.py
+# evaluators/evaluators.py
+
 from .coding_evaluator import CodingEvaluator
 from .generic_evaluator import GenericEvaluator
 

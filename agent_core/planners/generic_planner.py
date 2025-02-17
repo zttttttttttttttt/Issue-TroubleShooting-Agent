@@ -5,7 +5,7 @@ from typing import List, Optional, Dict
 from langchain_core.tools import BaseTool
 from .base_planner import BasePlanner, tool_knowledge_format, background_format
 from ..entities.steps import Steps, Step
-from ..evaluator.base_evaluator import BaseEvaluator
+from ..evaluators import BaseEvaluator
 from ..utils.context_manager import ContextManager
 
 

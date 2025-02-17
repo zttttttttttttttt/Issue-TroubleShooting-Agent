@@ -1,3 +1,5 @@
+# agents/agent.py
+
 from typing import Optional, List
 
 from langchain_core.tools import BaseTool
@@ -5,8 +7,8 @@ from agent_core.agent_basic import AgentModel
 from agent_core.entities.steps import Steps, Step
 from agent_core.planners.base_planner import BasePlanner
 from agent_core.utils.context_manager import ContextManager
-from agent_core.evaluator.evaluators import get_evaluator
-from agent_core.evaluator.base_evaluator import BaseEvaluator
+from agent_core.evaluators.evaluators import get_evaluator
+from agent_core.evaluators import BaseEvaluator
 
 
 class Agent(AgentModel):

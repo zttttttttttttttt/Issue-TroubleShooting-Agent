@@ -11,7 +11,7 @@ sys.path.insert(0, parent_dir)
 
 from agent_core.agents import Agent
 from agent_core.planners import GenericPlanner
-from agent_core.evaluator.coding_evaluator import CodingEvaluator
+from agent_core.evaluators import CodingEvaluator
 
 
 def main():
