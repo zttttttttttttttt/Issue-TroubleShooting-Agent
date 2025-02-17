@@ -101,9 +101,7 @@ def _should_replan(node: Node) -> bool:
     if last_score >= node.evaluation_threshold:
         return False
     elif node.current_attempts >= node.max_attempts:
-        failure_reason = (
-            f"Node {node.id} failed to reach threshold after {node.max_attempts} attempts."
-        )
+        failure_reason = f"Node {node.id} failed to reach threshold after {node.max_attempts} attempts."
         node.failed_reasons.append(failure_reason)
         return True
     return False
@@ -123,26 +121,30 @@ class GraphPlanner(BasePlanner):
 
 {context}
 
-Now, based on the above background and context, process the following task, please notice to avoid those responses in the failed attempts and take those suggestions before respond.
+Now, based on the above background and context, process the following task, please notice not to repeat those responses in the failed attempts and take those suggestions before respond.
 
 <Task>
 <Root Task>
 {task}
 </Root Task>
+<Current Task>
 {task_description}
+</Current Task>
 </Task>
 
-<Tool Use>
 Task Use Tool: {task_use_tool}
+
+<Tool Use>
 Task Tool Description: {tool_description}
-If Task Use Tool is `False`, process according to the `Task Description`,
-If Task Use Tool is `True`, process according to the `Task Tool`,,
+If Task Use Tool is `False`, process according to the description of the current task,
+If Task Use Tool is `True`, process using tools,
 For each tool argument, based on context and human's question to generate arguments value according to the argument description.
 
 The result must not contain any explanatory note (like '// explain'). Provide a pure JSON string that can be parsed.
+</Tool Use>
 
-Example:
-the example used tool:
+<Output Example>
+If task use tool is true, example:
 {{
     "use_tool": true,
     "tool_name": "Event",
@@ -150,12 +152,12 @@ the example used tool:
         "eventId": "1000"
     }}
 }}
-the example used context:
+If task use tool is false, example:
 {{
     "use_tool": false,
     "response": "result detail"
 }}
-</Tool Use>
+</Output Example>
 """
 
     DEFAULT_REPLAN_PROMPT = """
@@ -211,8 +213,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
 **Note:** Ensure your response is valid JSON, without any additional text or comments.
 """
 
-    def __init__(self, model_name: str = None,
-                 log_level: Optional[str] = None):
+    def __init__(self, model_name: str = None, log_level: Optional[str] = None):
         super().__init__(model_name, log_level)
         self.plan_graph: Optional[PlanGraph] = None
         self.context_manager = ContextManager()
@@ -239,12 +240,12 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         self._execute_prompt = value
 
     def plan(
-            self,
-            task: str,
-            tools: Optional[List[BaseTool]],
-            knowledge: str = "",
-            background: str = "",
-            categories: Optional[List[str]] = None
+        self,
+        task: str,
+        tools: Optional[List[BaseTool]],
+        knowledge: str = "",
+        background: str = "",
+        categories: Optional[List[str]] = None,
     ) -> Steps:
         """
         1) Call GenericPlanner to obtain a list of Steps using the same arguments.
@@ -298,14 +299,14 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         return plan
 
     def execute_plan(
-            self,
-            plan: Steps,
-            task: str,
-            execution_history: Steps,
-            evaluators_enabled: bool,
-            evaluators: dict,
-            context_manager: ContextManager = None,
-            background: str = "",
+        self,
+        plan: Steps,
+        task: str,
+        execution_history: Steps,
+        evaluators_enabled: bool,
+        evaluators: dict,
+        context_manager: ContextManager = None,
+        background: str = "",
     ):
         """
         Executes the PlanGraph node by node.
@@ -313,7 +314,9 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         This signature is here for consistency with the BasePlanner interface.
         """
         if not self.plan_graph:
-            self.logger.error("No plan graph found. Need to generate plan graph by plan() first.")
+            self.logger.error(
+                "No plan graph found. Need to generate plan graph by plan() first."
+            )
             return
 
         if context_manager:
@@ -330,22 +333,44 @@ You are an intelligent assistant helping to adjust a task execution plan represe
 
             node = pg.nodes[pg.current_node_id]
             response = self._execute_node(node, self.model_name, task, background)
-            execution_result, details = self._evaluate_node(node, response, evaluators_enabled, evaluators,
-                                                            context_manager)
-            self.logger.info(f"Node {node.id} execution score: {execution_result.evaluation_score}")
+            execution_result, details = self._evaluate_node(
+                node, task, response, evaluators_enabled, evaluators, context_manager
+            )
+            self.logger.info(
+                f"Node {node.id} execution score: {execution_result.evaluation_score}"
+            )
 
             if execution_result.evaluation_score >= node.evaluation_threshold:
                 if self.context_manager:
                     attempt = "|".join(str(i) for i in range(node.current_attempts + 1))
-                    self.context_manager.context = {k: v
-                                                    for k, v in self.context_manager.context.items()
-                                                    if not re.match(f"Previous Step {node.id}(.([0-9])*)* Failed Attempt {attempt}?", k)}
+                    self.context_manager.context = {
+                        k: v
+                        for k, v in self.context_manager.context.items()
+                        if not re.match(
+                            f"Previous Step {node.id}(.([0-9])*)* Failed Attempt {attempt}?",
+                            k,
+                        )
+                    }
+
+                    # Add node info to context
+                    key = f"Previous Step {node.id}"
+                    if self.context_manager:
+                        self.context_manager.add_context(
+                            key,
+                            f"""
+Task description: {node.task_description}
+Task response: {response}
+                        """,
+                        )
+                    # Keep the raw response in node's execution_results for reference
+                    node.execution_results.append(response)
+
                 node.result = response
                 execution_history.add_step(
                     Step(
                         name=node.id,
                         description=node.task_description,
-                        result=str(response)
+                        result=str(response),
                     )
                 )
                 if node.next_nodes:
@@ -358,9 +383,9 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                     self.logger.warning(f"Replanning needed at Node {node.id}")
                     failure_info = self.prepare_failure_info(node)
                     replan_response = self.call_llm_for_replan(pg, failure_info)
-                    adjustments = LLMChat(self.model_name, self.logger).parse_llm_response(
-                        replan_response
-                    )
+                    adjustments = LLMChat(
+                        self.model_name, self.logger
+                    ).parse_llm_response(replan_response)
                     if adjustments:
                         pg.replan_history.add_record(
                             {
@@ -402,14 +427,16 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                         self.context_manager.add_context(
                             key,
                             f"""
-                            Task response: {response}
+Task response: {response}
                             """,
                         )
 
                     continue
         return "Task execution completed using GraphPlanner."
 
-    def _execute_node(self, node: Node, model_name: str, task: str, background: str) -> str:
+    def _execute_node(
+        self, node: Node, model_name: str, task: str, background: str
+    ) -> str:
         """
         Build prompt + call the LLM. If 'use_tool', invoke the tool.
         """
@@ -462,23 +489,18 @@ You are an intelligent assistant helping to adjust a task execution plan represe
             self.logger.error(f"Raw LLM response was: {cleaned}")
             raise ValueError("Invalid JSON format in planner response.")
 
-        # Add node info to context
-        key = f"Previous Step {node.id}"
-        if self.context_manager:
-            self.context_manager.add_context(
-                key,
-                f"""
-Task description: {node.task_description}
-Task response: {response}
-            """,
-            )
-        # Keep the raw response in node's execution_results for reference
-        node.execution_results.append(response)
         self.logger.info(f"Response: {response}")
         return response
 
-    def _evaluate_node(self, node: Node, result: str, evaluators_enabled: bool,
-                       evaluators: Dict[str, BaseEvaluator], context_manager: ContextManager):
+    def _evaluate_node(
+        self,
+        node: Node,
+        root_task: str,
+        result: str,
+        evaluators_enabled: bool,
+        evaluators: Dict[str, BaseEvaluator],
+        context_manager: ContextManager,
+    ):
         """
         evaluate the node output using agent's evaluator if enabled.
         Return 0..1 scale.
@@ -504,7 +526,9 @@ Task response: {response}
             node.execution_results.append(execution_result)
             return execution_result
 
-        evaluator_result = evaluator.evaluate(node.task_description, result, context_manager)
+        evaluator_result = evaluator.evaluate(
+            root_task, node.task_description, result, context_manager
+        )
         numeric_score = float(evaluator_result.score) / 40.0
         execution_result = ExecutionResult(
             output=result, evaluation_score=numeric_score, timestamp=datetime.now()
@@ -561,8 +585,8 @@ Task response: {response}
             restart_node_id = adjustments.get("restart_node_id")
         elif action == "breakdown":
             if (
-                    adjustments.get("new_subtasks")
-                    and len(adjustments.get("new_subtasks")) > 0
+                adjustments.get("new_subtasks")
+                and len(adjustments.get("new_subtasks")) > 0
             ):
                 restart_node_id = adjustments.get("new_subtasks")[0].get("id")
             else:
@@ -606,9 +630,9 @@ Task response: {response}
 
 
 def apply_adjustments_to_plan(
-        plan_graph: PlanGraph,
-        node_id: str,
-        adjustments: str,
+    plan_graph: PlanGraph,
+    node_id: str,
+    adjustments: str,
 ):
     action = adjustments.get("action")
 

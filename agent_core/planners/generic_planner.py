@@ -140,15 +140,13 @@ class GenericPlanner(BasePlanner):
 
             # Optional Evaluation
             if evaluators_enabled:
-                self.process_evaluator(step, evaluators, response, context_manager)
+                self.process_evaluator(
+                    task, step, evaluators, response, context_manager
+                )
 
             # Record the step execution
             execution_history.add_step(
-                Step(
-                    name=step.name,
-                    description=step.description,
-                    result=str(response)
-                )
+                Step(name=step.name, description=step.description, result=str(response))
             )
             context_manager.add_context(
                 "Execution History",
@@ -156,17 +154,23 @@ class GenericPlanner(BasePlanner):
             )
         return "Task execution completed using GenericPlanner."
 
-    def process_evaluator(self, step: Step, evaluators: Dict[str, BaseEvaluator],
-                          response: str, context_manager: ContextManager):
-        chosen_cat = (
-            step.category if step.category in evaluators else "default"
-        )
+    def process_evaluator(
+        self,
+        root_task: str,
+        step: Step,
+        evaluators: Dict[str, BaseEvaluator],
+        response: str,
+        context_manager: ContextManager,
+    ):
+        chosen_cat = step.category if step.category in evaluators else "default"
         evaluator = evaluators.get(chosen_cat)
         if evaluator:
             evaluator_result = evaluator.evaluate(
-                step.description, response, context_manager
+                root_task, step.description, response, context_manager
             )
-            self.logger.info(f"Evaluator Decision: {evaluator_result.decision}, Score: {evaluator_result.score}")
+            self.logger.info(
+                f"Evaluator Decision: {evaluator_result.decision}, Score: {evaluator_result.score}"
+            )
         else:
             self.logger.warning(
                 f"No evaluator found even for 'default' category. Skipping evaluation."
@@ -192,7 +196,7 @@ class GenericPlanner(BasePlanner):
                     description=desc,
                     use_tool=use_tool,
                     tool_name=tool_name,
-                    category=final_cat
+                    category=final_cat,
                 )
                 plan.add_step(step)
             else:

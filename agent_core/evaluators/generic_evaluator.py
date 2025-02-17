@@ -33,30 +33,44 @@ At the end:
 - **Rerun Subtask** if the total score is 35 or below, or if any criterion scored below 3.
 
 - If recommending a rerun, provide suggestions on how to improve the output.
-
+- If output is an incorrect and unexpected structure in response, provide the structure evaluation output still (Socre 0 for each criteriea)
 ---
 
 **Context**
 {context}
 
-**Subtask Description:**
+**Description of ultimate task goal:**
+{root_task}
+
+**Description of current Step:**
 {request}
 
-**Subtask Output:**
+**Output of current step:**
 {response}
 
-**Evaluation:**
+**Evaluation of current step:**
 """
 
-    def __init__(self, model_name: Optional[str] = None, log_level: Optional[str] = None,
-                 evaluation_threshold: Optional[float] = 0.9):
+    def __init__(
+        self,
+        model_name: Optional[str] = None,
+        log_level: Optional[str] = None,
+        evaluation_threshold: Optional[float] = 0.9,
+    ):
         super().__init__(model_name, log_level, evaluation_threshold)
 
-    def evaluate(self, request, response, context_manager) -> EvaluatorResult:
+    def evaluate(
+        self, root_task, request, response, context_manager
+    ) -> EvaluatorResult:
         """
         Mandatory method from BaseEvaluator. Must return (decision, score, details).
         """
-        prompt_text = self.prompt.format(request=request, response=response, context=context_manager.context_to_str())
+        prompt_text = self.prompt.format(
+            root_task=root_task,
+            request=request,
+            response=response,
+            context=context_manager.context_to_str(),
+        )
         evaluation_response = self._model.process(prompt_text)
         decision, total_score, scores = self.parse_scored_evaluation_response(
             evaluation_response
