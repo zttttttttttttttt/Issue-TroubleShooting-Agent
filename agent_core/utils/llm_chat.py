@@ -49,12 +49,12 @@ Suggestions: Make it clearer how the data is processed.
 Now, produce your evaluation:
 """
 
-    def __init__(self, name, model_name: str = None, log_level: str = None):
+    def __init__(self, model_name: str = None, log_level: str = None):
         """
         If model_name is None, use the default model from Config.
         This class can be used to do both summarization and text-critique.
         """
-        super().__init__(name, model_name, log_level)
+        super().__init__(self.__class__.__name__, model_name, log_level)
         self._evaluate_text_prompt = self.DEFAULT_EVALUATE_TEXT_PROMPT
 
     @property
