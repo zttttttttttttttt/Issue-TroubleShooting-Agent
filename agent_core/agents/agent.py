@@ -41,6 +41,20 @@ Execution History:
 Summary:
 """
 
+    DEFAULT_FINAL_RESPONSE_PROMPT = """
+You are an assistant to response user's query.
+Given user'query and step-by-step result of execution history. 
+Generate the final response to user. The final answer usually in the last step.
+
+User Query:
+{task}
+
+Execution History:
+{history_text}
+
+Response:
+"""
+
     def __init__(self, model_name: Optional[str] = None, log_level: Optional[str] = None):
         """
         If 'model' is not provided, the default model from config will be used.
@@ -65,6 +79,7 @@ Summary:
         # Prompt strings for direct (no-planner) usage and summary
         self.execute_prompt = self.DEFAULT_EXECUTE_PROMPT
         self.summary_prompt = self.DEFAULT_SUMMARY_PROMPT
+        self.response_prompt=self.DEFAULT_FINAL_RESPONSE_PROMPT
 
         # NEW: evaluator management
         self.evaluators_enabled = False
@@ -95,7 +110,7 @@ Summary:
         )
 
         # Now just call planner's execute_plan(...) in a unified way
-        return self.planner.execute_plan(
+        self.planner.execute_plan(
             task=task,
             plan=plan,
             execution_history=self._execution_history,
@@ -104,6 +119,9 @@ Summary:
             evaluators_enabled=self.evaluators_enabled,
             evaluators=self.evaluators,
         )
+    
+        return self.get_final_response(task)
+    
 
     def execute_without_planner(self, task: str):
         context_section = self.context.context_to_str()
@@ -122,6 +140,14 @@ Summary:
             )
         )
         return response
+
+    
+    def get_final_response(self, task: str) -> str:
+        history_text = self._execution_history.execution_history_to_str()
+        final_response_prompt=self.response_prompt.format(task=task,history_text=history_text)
+        self.logger.info("Generating final response.")
+        final_response = self._model.process(final_response_prompt)
+        return str(final_response)
 
     def get_execution_result_summary(self) -> str:
         """

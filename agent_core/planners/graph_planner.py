@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 from langchain_core.tools import BaseTool
 
-from agent_core.utils.llm_chat import LLMChat
+from agent_core.utils.llm_chat import parse_llm_response
 from agent_core.utils.logger import get_logger
 
 
@@ -383,8 +383,8 @@ Task response: {response}
                     self.logger.warning(f"Replanning needed at Node {node.id}")
                     failure_info = self.prepare_failure_info(node)
                     replan_response = self.call_llm_for_replan(pg, failure_info)
-                    adjustments = LLMChat(self.model_name).parse_llm_response(replan_response)
-                    if adjustments:
+                    try:
+                        adjustments = parse_llm_response(replan_response)
                         pg.replan_history.add_record(
                             {
                                 "timestamp": datetime.now(),
@@ -409,10 +409,11 @@ Task response: {response}
                             pg.current_node_id = restart_node_id
                         else:
                             break
-                    else:
+
+                    except json.JSONDecodeError as e:
                         self.logger.error(
-                            "Could not parse LLM response for replan, aborting."
-                        )
+                                "Could not parse LLM response for replan, aborting."
+                            )
                         break
                 else:
                     # Retry the same node
