@@ -36,6 +36,9 @@ At the end:
 - If output is an incorrect and unexpected structure in response, provide the structure evaluation output still (Score 0 for each criteria)
 ---
 
+**Background**
+{background}
+
 **Context**
 {context}
 
@@ -60,7 +63,7 @@ At the end:
         super().__init__(model_name, log_level, evaluation_threshold)
 
     def evaluate(
-        self, root_task, request, response, context_manager
+        self, root_task, request, response, background, context_manager
     ) -> EvaluatorResult:
         """
         Mandatory method from BaseEvaluator. Must return (decision, score, details).
@@ -69,6 +72,7 @@ At the end:
             root_task=root_task,
             request=request,
             response=response,
+            background=background,
             context=context_manager.context_to_str(),
         )
         evaluation_response = self._model.process(prompt_text)

@@ -4,7 +4,7 @@ import json
 import re
 
 from agent_core.evaluators import BaseEvaluator
-from agent_core.planners.base_planner import BasePlanner
+from agent_core.planners.base_planner import BasePlanner, background_format, tool_knowledge_format
 from agent_core.planners.generic_planner import GenericPlanner, Step
 from agent_core.models.model_registry import ModelRegistry
 from agent_core.utils.context_manager import ContextManager
@@ -163,6 +163,21 @@ If task use tool is false, example:
     DEFAULT_REPLAN_PROMPT = """
 You are an intelligent assistant helping to adjust a task execution plan represented as a graph of subtasks. Below are the details:
 
+**Background:**
+{background}
+
+**Knowledge:**
+{knowledge}
+
+**Tools:**
+{tools_knowledge}
+
+**Root Task:**
+{root_task}
+
+**Categories:**
+{categories_str}
+
 **Current Plan:**
 {plan_summary}
 
@@ -181,7 +196,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
     1. **breakdown**: Break down the task of failed node {current_node_id} into smaller subtasks.
     2. **replan**: Go back to a previous node for replanning, 
 - If you choose **breakdown**, provide detailed descriptions of the new subtasks, only breakdown the current (failed) node, otherwise it should be replan. ex: if current node is B, breakdown nodes should be B.1, B.2, if current node is B.2, breakdown nodes should be B.2.1, B.2.2... and make the all nodes as chain eventually.
-- If you choose **replan**, specify which node to return to and suggest any modifications to the plan after that node, do not repeat previous faillure replanning in the Replanning History.
+- If you choose **replan**, specify which node to return to and suggest any modifications to the plan after that node, do not repeat previous failure replanning in the Replanning History.
 - The id generated following the naming convention as A.1, B.1.2, C.2.5.2, new id (not next_nodes) generation example: current: B > new sub: B.1, current: B.2.2.2 > new sub: B.2.2.2.1
 - Return your response in the following JSON format (do not include any additional text):
 
@@ -269,6 +284,11 @@ You are an intelligent assistant helping to adjust a task execution plan represe
         plan_graph = PlanGraph()
 
         plan_graph.prompt = self._replan_prompt  # If needed for replan calls
+        plan_graph.background = background
+        plan_graph.knowledge = knowledge
+        plan_graph.categories = categories
+        plan_graph.task = task
+        plan_graph.tools = tool_knowledge_format(tools)
 
         previous_node = None
         tool_map = {}
@@ -334,7 +354,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
             node = pg.nodes[pg.current_node_id]
             response = self._execute_node(node, self.model_name, task, background)
             execution_result, details = self._evaluate_node(
-                node, task, response, evaluators_enabled, evaluators, context_manager
+                node, task, response, evaluators_enabled, evaluators, background, context_manager
             )
             self.logger.info(
                 f"Node {node.id} execution score: {execution_result.evaluation_score}"
@@ -497,6 +517,7 @@ Task response: {response}
         result: str,
         evaluators_enabled: bool,
         evaluators: Dict[str, BaseEvaluator],
+        background: str,
         context_manager: ContextManager,
     ):
         """
@@ -525,7 +546,7 @@ Task response: {response}
             return execution_result
 
         evaluator_result = evaluator.evaluate(
-            root_task, node.task_description, result, context_manager
+            root_task, node.task_description, result, background, context_manager
         )
         numeric_score = float(evaluator_result.score) / 40.0
         execution_result = ExecutionResult(
@@ -563,7 +584,12 @@ Task response: {response}
         )
 
         final_prompt = plan_graph.prompt.format(
+            background=plan_graph.background,
+            knowledge=plan_graph.knowledge,
+            tools_knowledge=plan_graph.tools_knowledge,
+            root_task=plan_graph.task,
             context_str=context_str,
+            categories_str=plan_graph.categories_str,
             plan_summary=plan_summary,
             execution_history=failure_info["execution_history"],
             failure_reason=failure_info["failure_reason"],
