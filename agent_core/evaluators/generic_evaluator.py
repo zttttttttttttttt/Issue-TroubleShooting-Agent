@@ -33,7 +33,7 @@ At the end:
 - **Rerun Subtask** if the total score is 35 or below, or if any criterion scored below 3.
 
 - If recommending a rerun, provide suggestions on how to improve the output.
-- If output is an incorrect and unexpected structure in response, provide the structure evaluation output still (Socre 0 for each criteriea)
+- If output is an incorrect and unexpected structure in response, provide the structure evaluation output still (Score 0 for each criteria)
 ---
 
 **Context**

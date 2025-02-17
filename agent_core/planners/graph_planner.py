@@ -340,7 +340,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                 f"Node {node.id} execution score: {execution_result.evaluation_score}"
             )
 
-            if execution_result.evaluation_score >= 0.95:
+            if execution_result.evaluation_score >= node.evaluation_threshold:
                 if self.context_manager:
                     attempt = "|".join(str(i) for i in range(node.current_attempts + 1))
                     self.context_manager.context = {
