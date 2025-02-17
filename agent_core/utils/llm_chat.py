@@ -1,6 +1,8 @@
 import re
 import json
 from typing import Optional
+
+from agent_core.agent_basic import AgentBasic
 from agent_core.models.model_registry import ModelRegistry
 from agent_core.utils.logger import get_logger
 import os
@@ -29,7 +31,7 @@ def _parse_rating(response_text: str) -> int:
     return 1
 
 
-class LLMChat:
+class LLMChat(AgentBasic):
     DEFAULT_EVALUATE_TEXT_PROMPT = """\
 You are a critical evaluator. Below is some text to evaluate:
 Text:
@@ -47,19 +49,12 @@ Suggestions: Make it clearer how the data is processed.
 Now, produce your evaluation:
 """
 
-    def __init__(self, model_name: str = None, log_level: str = None):
+    def __init__(self, name, model_name: str = None, log_level: str = None):
         """
         If model_name is None, use the default model from Config.
         This class can be used to do both summarization and text-critique.
         """
-        self.logger = get_logger("llm-chat", log_level)
-        if not model_name:
-            model_name = os.getenv("DEFAULT_MODEL")
-        self.model_name = model_name
-        self.model = ModelRegistry.get_model(self.model_name)
-        if not self.model:
-            raise ValueError(f"Model '{self.model_name}' not found in registry.")
-        self.logger.info(f"LLMChat initialized with model: {self.model.name}")
+        super().__init__(name, model_name, log_level)
         self._evaluate_text_prompt = self.DEFAULT_EVALUATE_TEXT_PROMPT
 
     @property
@@ -72,7 +67,7 @@ Now, produce your evaluation:
         self._evaluate_text_prompt = value
 
     def process(self, request: str) -> str:
-        response = self.model.process(request)
+        response = self._model.process(request)
         self.logger.debug(f"Response: {response}")
         return response.strip()
 
@@ -96,7 +91,7 @@ Now, produce your evaluation:
             input_text=input_text,
             criteria=criteria,
         )
-        response = self.model.process(prompt)
+        response = self._model.process(prompt)
         self.logger.debug(f"Evaluate raw response: {response}")
         # Parse rating from 1..10
         rating_val = _parse_rating(response)

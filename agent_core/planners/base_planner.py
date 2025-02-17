@@ -3,7 +3,7 @@
 from abc import abstractmethod
 from typing import List, Optional
 from langchain_core.tools import BaseTool
-from agent_core.agent_basic import AgentModel
+from agent_core.agent_basic import AgentBasic
 from agent_core.entities.steps import Steps
 
 
@@ -24,7 +24,7 @@ def background_format(background: str) -> str:
     return background_str
 
 
-class BasePlanner(AgentModel):
+class BasePlanner(AgentBasic):
     """
     An abstract base class for all planners.
     Both GenericPlanner and GraphPlanner will inherit from this.

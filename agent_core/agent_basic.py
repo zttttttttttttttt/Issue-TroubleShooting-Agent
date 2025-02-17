@@ -6,7 +6,7 @@ import os
 from agent_core.utils.logger import get_logger
 
 
-class AgentModel(ABC):
+class AgentBasic(ABC):
 
     def __init__(self, name, model_name: Optional[str] = None,
                  log_level: Optional[str] = None):

@@ -3,12 +3,12 @@
 from abc import abstractmethod
 from typing import Optional
 
-from agent_core.agent_basic import AgentModel
+from agent_core.agent_basic import AgentBasic
 from agent_core.evaluators.entities.evaluator_result import EvaluatorResult
 from agent_core.utils.context_manager import ContextManager
 
 
-class BaseEvaluator(AgentModel):
+class BaseEvaluator(AgentBasic):
     """
     A base class for all evaluator. Every evaluator must implement `evaluator()`.
     """
