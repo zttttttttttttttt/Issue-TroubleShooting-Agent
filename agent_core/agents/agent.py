@@ -31,16 +31,15 @@ class Agent(AgentBasic):
 
     DEFAULT_SUMMARY_PROMPT = """
 You are an assistant summarizing the outcome of a multi-step plan execution.
-Below is the complete step-by-step execution history. Provide a concise,
-well-structured summary describing how the solution was achieved and any
-notable details. Include each step's role in the final outcome. 
-And display the last step result as output in execution history
+Below is the complete step-by-step execution history. Provide a well-structured summary describing how the solution was achieved and any notable details, make sure to include each step's result in the final summary. 
 
 Execution History:
 {history_text}
 
-Output:
-Summary:
+Output format:
+## Summary
+## Output Result
+## Consclusion
 """
 
     def __init__(self, model_name: Optional[str] = None, log_level: Optional[str] = None):
