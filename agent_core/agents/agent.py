@@ -31,14 +31,15 @@ class Agent(AgentBasic):
 
     DEFAULT_SUMMARY_PROMPT = """
 You are an assistant summarizing the outcome of a multi-step plan execution.
-Below is the complete step-by-step execution history. Provide a concise,
-well-structured summary describing how the solution was achieved and any
-notable details. Include each step's role in the final outcome.
+Below is the complete step-by-step execution history. Provide a well-structured summary describing how the solution was achieved and any notable details, make sure to include each step's result in the final summary. 
 
 Execution History:
 {history_text}
 
-Summary:
+Output format:
+## Summary
+## Output Result
+## Conclusion
 """
 
     DEFAULT_FINAL_RESPONSE_PROMPT = """
@@ -121,7 +122,6 @@ Response:
         )
     
         return self.get_final_response(task)
-    
 
     def execute_without_planner(self, task: str):
         context_section = self.context.context_to_str()
@@ -141,7 +141,6 @@ Response:
         )
         return response
 
-    
     def get_final_response(self, task: str) -> str:
         history_text = self._execution_history.execution_history_to_str()
         final_response_prompt=self.response_prompt.format(task=task,history_text=history_text)

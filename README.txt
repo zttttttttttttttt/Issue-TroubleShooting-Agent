@@ -1,11 +1,11 @@
 # PhAENix - Single LLM Agent Development Framework
 
-PhAENix is an advanced, developer-friendly framework for building **single reliable LLM-based autonomous agents**, integrating **task planning**, **evaluation**, and **execution** into a seamless workflow. It abstracts complex aspects such as prompt engineering, multi-model coordination, and operational flow management—enabling developers to create powerful agents without being overwhelmed by technical intricacies. With a flexible design, PhAENix supports a wide range of use cases while allowing fine-grained control over each component.
+PhAENix is an advanced, developer-friendly framework for building **single reliable LLM-based autonomous agents**, integrating **task planning**, **validation**, and **execution** into a seamless workflow. It abstracts complex aspects such as prompt engineering, multi-model coordination, and operational flow management—enabling developers to create powerful agents without being overwhelmed by technical intricacies. With a flexible design, PhAENix supports a wide range of use cases while allowing fine-grained control over each component.
 
-- **Developer-Friendly**: By hiding most of the underlying complexity, this framework makes it straightforward for developers to specify high-level goals such as planning steps and configuring evaluation without worrying about convoluted implementation details.
+- **Developer-Friendly**: By hiding most of the underlying complexity, this framework makes it straightforward for developers to specify high-level goals such as planning steps and configuring validation without worrying about convoluted implementation details.
 - **Planner Variety**: The framework offers flexible planning options, including step-based planners like GenericPlanner and more complex node-graph planners like GraphPlanner, ensuring that both simple and intricate workflows are supported seamlessly.
-- **evaluation Architecture**: It includes a robust evaluation system that checks outputs at every step, allowing errors to be detected early. This iterative evaluation significantly enhances overall accuracy by ensuring that tasks are iteratively refined or dynamically adjusted.
-- **Custom Configuration**: Users can adjust the framework to use different LLM models for different components—such as planning, evaluation, or execution—allowing precise control over the agent's behavior. Additionally, customizing prompts for each module allows for specific and tailored interactions at each stage.
+- **Validation Architecture**: It includes a robust validation system that checks outputs at every step, allowing errors to be detected early. This iterative validation significantly enhances overall accuracy by ensuring that tasks are iteratively refined or dynamically adjusted.
+- **Custom Configuration**: Users can adjust the framework to use different LLM models for different components—such as planning, validation, or execution—allowing precise control over the agent's behavior. Additionally, customizing prompts for each module allows for specific and tailored interactions at each stage.
 - **Tool & Ul Integration**: The framework supports dynamic tool use and integration with external APls. Developers can call functions, engage in real-time interactions, or retrieve live data as part of the agent's workflow, enabling interactive scenarios and adaptive behavior.
 
 In summary, this LLM agent framework offers the perfect balance between abstraction and customization, empowering developers to create powerful, intelligent agents with minimal effort while ensuring flexibility and precision in every step.
@@ -25,7 +25,7 @@ PhAENix seamlessly integrates the mythical rebirth of the Phoenix with the LLM A
 
 1. [Key Innovation Features](#key-innovation-features)
    - [Replan](#replan)
-   - [Step evaluation](#step-evaluation)
+   - [Step Validation](#step-validation)
    - [Percise Context Control](#percise-context-control)
 2. [Comparison with Other Frameworks](#comparison-with-other-frameworks)
 3. [Installation](#installation)
@@ -38,60 +38,85 @@ Below are some notable innovation highlights that set PhAENix apart. You can fur
 
 ### Replan
 
-A concise description or tagline.  
+This replan design provides a flexible approach by allowing two distinct failure-handling strategies: **breakdown**, which refines a failing task into simpler subtasks, and **replan**, which reroutes the execution path to an earlier node and modifies future tasks as needed. By dynamically choosing between these strategies whenever a node fails to meet its evaluation threshold, the system can adapt, restructure, and continue executing without having to stop or discard all progress, ultimately achieving more resilient and robust task completion. 
+
 _(Add more detailed explanations or images here.)_
 
-### Step evaluation
+### Self Reflection
 
-A concise description or tagline.  
+By continuously measuring each node’s output against an evaluation threshold, the system pinpoints underperforming steps and decides whether to retry or move on to a more robust replan flow. This loop of “try-evaluate-improve” not only captures each failed attempt in the PlanGraph but also records the specific failure reasons and previous execution history, ensuring that the agent learns from past mistakes. This design fosters continuous refinement: it retains a local context of failures and updates the plan accordingly so the agent can self-diagnoses errors and auto recover until the task is completed successfully.
+
+_(Add more detailed explanations or images here.)_
+
+### Single Step Evaluation
+
+Each step’s result undergoes a structured assessment across eight distinct criteria—covering areas like accuracy, completeness, relevance, clarity, consistency, instruction adherence, error analysis, and ethical compliance—to yield a numeric score out of 40. This granular scoring not only highlights the specific dimensions of quality (e.g., identifying if clarity is lacking), but also enables an informed accept-or-rerun decision if any criterion falls below an acceptable threshold.
+
 _(Add more detailed explanations or images here.)_
 
 ### Percise Context Control
 
-A concise description or tagline.  
+The planner’s handling of context is notably well-crafted, as each time a node is retried or replaced, the ContextManager selectively clears outdated entries and adds fresh details. By pruning stale or repetitive information, the model stays focused on only the most relevant partial history, avoiding confusion from repeated mistakes. This streamlined approach significantly elevates clarity and consistency in LLM responses, ensuring that each new attempt or subtask benefits from concise, targeted context rather than becoming entangled in excessive or irrelevant backstory.
+
 _(Add more detailed explanations or images here.)_
 
 ## Comparison with Other Frameworks
 
 Below is a report comparing PhAENix with two other notable frameworks, **autogen** and **langgraph**, across several key features:
 
-| Feature                               | **PhAENix**        | **AutoGen**  | **LangGraph** |
-| ------------------------------------- | ------------------ | ------------ | ------------- |
-| **Developer-Friendliness**            | ⭐️⭐️⭐️⭐️⭐️    | ⭐️⭐️⭐️⭐️ | ⭐️⭐️⭐️     |
-| **Planner Variety (Step/Graph)**      | Yes (Multiple)     | Partial/Yes? | Partial/No?   |
-| **Iterative evaluation Architecture** | Yes (Core Feature) | Yes/No?      | Yes/No?       |
-| **Customizable LLM & Prompts**        | Fully Modular      | Yes/No?      | Yes/No?       |
-| **Tool & UI Integration**             | Native Support     | Limited/No?  | Limited/No?   |
+| Feature                                   | **AutoGen**        | **LangGraph**    | **PhAENix**   | 
+| ----------------------------------------- | ------------------ | ---------------- | ------------- |
+| **Multi-Agent Collaboration Framework**   | Yes                | Yes              | No            |
+| **Conversational Agents Interaction**     | Yes                | No               | No            |
+| **Fine-Grained Workflow Control**         | No                 | Yes              | Yes           |
+| **Graph-based Agentic Workflow**          | No                 | Yes              | Yes           |
+| **Status Management**                     | No                 | Yes              | Yes           |
+| **Replay & Debugging**                    | No                 | Yes              | Yes           |
+| **Tool Integration**                      | Yes                | Yes              | Yes           |
+| **Single Step Evaluation**                | No                 | No               | Yes           |
+| **Dynamic Replaning**                     | No                 | No               | Yes           |
+| **Self Reflection & Recovery**            | No                 | No               | Yes           |
+| **Percise Context Management**            | No                 | No               | Yes           |
+| **Customizable LLM Prompts**              | No                 | No               | Yes           |
+| **Developer-Friendliness**                | ⭐️⭐️⭐️              | ⭐️⭐️⭐️⭐️           | ⭐️⭐️⭐️⭐️⭐️     |
+| **Reliability**                           | ⭐️⭐️⭐️              | ⭐️⭐️⭐️            | ⭐️⭐️⭐️⭐️⭐️      |
 
 ## Installation
+
+### Debug Mode
 
 #### 1. Clone the repository
 
 ```bash
 git clone https://github.com/lukewu8023/agent-core.git
-cd agent-core
 ```
 
-#### 2. (Optional) Create a virtual environment
+#### 2. Download examples project or create your own project
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
+git clone https://github.com/lukewu8023/agent-examples.git
+cd agent-examples
 ```
 
 #### 3. Install the project as a library
 
-If there is a setup.py file in the root directory, you can do:
-
-```bash
-pip install -e .
-```
-
-If no setup.py is present, you can install by referencing the directory:
-
 ```bash
 pip install -e path/to/agent-core
+```
+
+### Production Mode
+
+#### 1. Download examples project or create your own project
+
+```bash
+git clone https://github.com/lukewu8023/agent-examples.git
+cd agent-examples
+```
+
+#### 2. Install the project as a library
+
+```bash
+pip install agent-core
 ```
 
 This will make the agents, planners, models, etc. available in your Python environment.
@@ -101,9 +126,63 @@ This will make the agents, planners, models, etc. available in your Python envir
 For a comprehensive set of examples demonstrating how to use PhAENix in various scenarios, please visit our **[agent-examples repository](https://github.com/lukewu8023/agent-examples)**. There you will find **detailed examples** that show how to:
 
 - Integrate different planners ([Example 1](#))
-- Configure and customize evaluation loops ([Example 2](#))
+- Configure and customize validation loops ([Example 2](#))
 - Set up multiple LLMs for specific subtasks ([Example 3](#))
 
+### Simple Example
+
+```python
+from agent_core.agents import Agent
+
+agent = Agent()
+agent.execute("Who are you?")
+```
+### Advanced Example
+
+```python
+from agent_core.agents import Agent
+from agent_core.planners import GraphPlanner
+from agent_core.evaluators import CodingEvaluator
+
+# Agent
+agent = Agent(model_name="gemini-1.5-flash-002")
+
+# Planner
+planner = GraphPlanner(model_name="gemini-1.5-pro-002", log_level="DEBUG")
+print("Default Planner Prompt: ", planner.prompt)
+planner.prompt = "New planner prompt: xxx"
+agent.planner = planner
+
+# Evaluator
+agent.enable_evaluators()
+print("Default evaluator:", agent.evaluators)
+coding_evaluator = CodingEvaluator(model_name="gemini-1.5-pro-002")
+agent.add_evaluator("coding", coding_evaluator)
+
+# Knowledge
+agent.knowledge = "to draw a object you need to take 3 steps, 1) prepare tools, 2) prepare paper, 3) draw the object"
+
+# Background
+agent.background = "You are a professional artist"
+
+# Context
+context = agent.context
+context.add_context(
+    "role",
+    f"""
+    you are an digital artist, able to use computer character to draw digital picture.
+    """,
+)
+
+# Execute
+agent.execute("Who are you?")
+
+# Execution Result
+execution_responses = agent.execution_responses
+execution_history = agent.execution_history
+execution_result = agent.get_execution_result_summary()
+    
+```
 ---
 
 ## Feedback & Usage Tracking

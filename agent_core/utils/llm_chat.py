@@ -4,13 +4,6 @@ from typing import Optional
 from agent_core.agent_basic import AgentBasic
 
 
-def parse_llm_response(llm_response: str) -> Optional[str]:
-
-    cleaned = llm_response.replace("```json", "").replace("```", "").strip()
-    llm_response_json = json.loads(cleaned)
-    return llm_response_json
-
-
 def _parse_section(response_text: str, label: str) -> str:
     """
     Extract text after the given label, e.g. "Summary:" or "Suggestions:".

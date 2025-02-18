@@ -1,4 +1,4 @@
-# examples/example6.py
+# examples/example14.py
 
 import sys
 import os
@@ -81,7 +81,7 @@ def main():
     response1 = agent.execute(task)
     print(response1)
 
-    # for multi-turn what context whould be removed? self._execution_history?
+    # for multi-turn what context should be removed? self._execution_history?
     follow_up_task="what is the create time of this policy"
     response2 = agent.execute(follow_up_task)
     print(response2)
