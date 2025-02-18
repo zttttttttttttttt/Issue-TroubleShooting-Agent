@@ -23,9 +23,9 @@ def get_metric(
     """Get metric data from prometheus by component name"""
     return [
         {"component": "Client maintain system", "name": "CPU Usage",
-         "desc": "the cpu usage of the component, unit is %", "data": [[123456789, 10], [123456789, 12]]},
-        {"component": "Client maintain system", "name": "DB Memory Usage",
-         "desc": "the memory usage of the database, unit is %", "data": [[123456789, 100], [123456789, 100]]},
+         "desc": "the cpu usage of the component, unit is %", "data": [[123456789, 90], [123456789, 89]]},
+        {"component": "Client maintain system", "name": "Memory Usage",
+         "desc": "the memory usage of the database, unit is %", "data": [[123456789, 60], [123456789, 61]]},
     ]
 
 
@@ -37,7 +37,10 @@ def get_log(
         end_time: Annotated[int, "end time"],
 ) -> dict:
     """Get log from kibana by component name and event id"""
-    return {"trace_id": "123456-123456-123456", "component": "IE", "event_id": "10000", "log": "sql execute failed"}
+    return {
+        "trace_id": "123456-123456-123456", "component": "IE", "event_id": "10000", "log": "504 Gateway Timeout for view commodity details",
+        "trace_id": "123457-123457-123457", "component": "IE", "event_id": "10000", "log": "504 Gateway Timeout for view commodity details"
+    }
 
 
 @tool("trace")
@@ -45,9 +48,22 @@ def get_trace(trace_id: Annotated[str, "trace id"]) -> List:
     """Get trace data from jaeger by trace id"""
     return [
         {
-            "eventId": 10000,
             "traceId": "123456-123456-123456",
-            "process": "sql execute failed, select * from ClientInfo.table where client_name like '%z%'",
+            "process": "select * from commodities where id = 999",
+        },
+        {
+            "traceId": "123457-123457-123457",
+            "process": "select * from commodities where id = 1000",
+        }
+    ]
+
+
+@tool("pod")
+def increase_pod(pod_num: Annotated[int, "pod amount"]) -> List:
+    """Increase pods number in Kubernetes"""
+    return [
+        {
+            "podReplicas": 2
         }
     ]
 
@@ -59,36 +75,30 @@ def main():
     agent.knowledge = """\
     You are expert at issue trouble shooting. 
     You understand user query with knowledge to determine issue context, then give out detailed trouble shooting plans and execute plans with tools,
-    finally you provide summary report including issue descript, root cause cause and solution advise
+    then you provide summary report including issue descript, root cause cause and solution advise
+    finally you could use tool to do action with best recommended solution
     """
 
     agent.background = """\
-    The client maintain system provides functions for traders to view clients' information and their intentions of finical products.
-    In client's profile page, traders can view the latest info of clients based on resultful apis.
-    Million Client info are stored in Database where client id are indexed. Pay attention to full table scan which may resulting performance issue.
+    FIN is a web application deployed on Kubernetes that serves as the backend for an e-commerce platform.
+    The traffic to FIN may increase significantly during shopping festival.
+    The current deployment has 1 pod.
     """
-
-    # # Placeholders typically include: {task}, {tools_knowledge}, {knowledge}, {example_json1}, {example_json2}.
-    # planner.prompt = """\
-    #    I want detailed steps:
-    #    Task: {task}
-    #    Tools: {tools_knowledge}
-    #    output each issue troubleshooting plans with the recommendation descending order, each plans may have multiple steps
-    #    Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name', and 'step_category'.
-    #    """
 
     agent.planner = GraphPlanner()
 
-    task = "I cannot open client's profile page in client maintain system from 3:00 AM, I cannot see the latest info of clients. Pls give me the root cause"
+    task = "Many users report experiencing extremely slowness in FIN specially in Black Friday"
     agent.execute(task)
 
     # add summary_prompt
     agent.summary_prompt = IssueTroubleShootingSummary.ISSUE_TROUBLESHOOT_PROMPT
 
     execution_history = agent.execution_history
-    # print(f"Execution History: {execution_history}")
+    print(f"Execution History: {execution_history}")
+    print("\n")
     print(f"Response: {agent.execution_responses}")
     execution_result = agent.get_execution_result_summary()
+    print("\n")
     print(f"Execution Summary: {execution_result}")
 
 
