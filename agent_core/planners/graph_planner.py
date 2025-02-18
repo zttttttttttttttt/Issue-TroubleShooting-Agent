@@ -367,7 +367,7 @@ You are an intelligent assistant helping to adjust a task execution plan represe
                         k: v
                         for k, v in self.context_manager.context.items()
                         if not re.match(
-                            f"Previous Step {node.id}(.([0-9])*)* Failed Attempt {attempt}?",
+                            f"Previous Step {node.id}(.([0-9])*)* Failed Attempt ({attempt})?",
                             k,
                         )
                     }
@@ -401,7 +401,7 @@ Task response: {response}
             else:
                 if _should_replan(node):
                     self.logger.warning(f"Replanning needed at Node {node.id}")
-                    failure_info = self.prepare_failure_info(node)
+                    failure_info = self.prepare_failure_info(node, details)
                     replan_response = self.call_llm_for_replan(pg, failure_info)
                     adjustments = LLMChat(self.model_name).parse_llm_response(replan_response)
                     if adjustments:
@@ -487,15 +487,20 @@ Task response: {response}
 
         response = ModelRegistry.get_model(model_name).process(final_prompt)
         cleaned = response.replace("```json", "").replace("```", "").strip()
+        cleaned = cleaned.replace("\\", "\\\\")
         try:
             data = json.loads(cleaned)
             if "use_tool" in data:
                 if data["use_tool"]:
                     if node.task_tool is not None:
-                        response = (
-                            f"task tool description: {node.task_tool.description}\n"
-                            f"task tool response : {node.task_tool.invoke(data['tool_arguments'])}"
-                        )
+                        try:
+                            tool_response = node.task_tool.invoke(data['tool_arguments'])
+                            response = (
+                                f"task tool description: {node.task_tool.description}\n"
+                                f"task tool response : {tool_response}"
+                            )
+                        except Exception as e:
+                            response = "Incorrect tool arguments and unexpected result when invoke the tool."
                     else:
                         response = "Tool usage was requested, but no tool is attached to this node."
                 else:
@@ -507,7 +512,7 @@ Task response: {response}
             self.logger.error(f"Raw LLM response was: {cleaned}")
             raise ValueError("Invalid JSON format in planner response.")
 
-        self.logger.info(f"Response: {response}")
+        self.logger.info(f"Response:\n {response}")
         return response
 
     def _evaluate_node(
@@ -555,14 +560,14 @@ Task response: {response}
         node.execution_results.append(execution_result)
         return execution_result, evaluator_result.details
 
-    def prepare_failure_info(self, node: Node) -> Dict:
+    def prepare_failure_info(self, node: Node, details: str) -> Dict:
         """
         Produce the context for replan prompt.
         """
         pg = self.plan_graph
         return {
             "failure_reason": (
-                node.failed_reasons[-1] if node.failed_reasons else "Unknown"
+                node.failed_reasons[-1] if node.failed_reasons else "No"
             ),
             "execution_history": [
                 {
@@ -575,6 +580,7 @@ Task response: {response}
                 for n in pg.nodes.values()
             ],
             "replan_history": pg.replan_history.history,
+            "evaluator": details,
         }
 
     def call_llm_for_replan(self, plan_graph: PlanGraph, failure_info: Dict) -> str:
@@ -586,10 +592,10 @@ Task response: {response}
         final_prompt = plan_graph.prompt.format(
             background=plan_graph.background,
             knowledge=plan_graph.knowledge,
-            tools_knowledge=plan_graph.tools_knowledge,
+            tools_knowledge=plan_graph.tools,
             root_task=plan_graph.task,
             context_str=context_str,
-            categories_str=plan_graph.categories_str,
+            categories_str=", ".join(plan_graph.categories) if plan_graph.categories else "(Not defined)",
             plan_summary=plan_summary,
             execution_history=failure_info["execution_history"],
             failure_reason=failure_info["failure_reason"],

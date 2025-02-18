@@ -2,17 +2,13 @@
 
 ### Feature
 - compatible with autogen and langgraph
-- change context by step(v2)
-- validation retry in generic planner(v1)
+- tool execute try catch exception add evaluator, add suggestion (v1) (done need test)
+- validation retry in generic planner(v1) (done need test)
 - support overwrite validation max attempt and threshold(v2)
 - knowledge graph to collect sufficient information(v2)
 - enrich log (input/output/prompt)(v2)
-- summary include agent execute result(v1)
-- execute: background, context, tool (v1)
-- evaluator: background, context (v1)
-- replan: background, knowledge, categories_str, task, tool (background, knowledge, categories_str, task, tool) (v1)
 - knowledge & background rag (v2)
-- tool execute try catch exception add evaluator, add suggestion (v1)
+- change context by step(v2)
 
 ### Test
 - more unit testing
@@ -31,7 +27,7 @@
 - successful generation rate
 - put example in another project
 - UI interaction
-- bug (done)
+- bug
 ```json
 {
      "id": "B.2.1.1.2",
@@ -48,3 +44,8 @@
 - change validator to evaluator
 - abstract validator base, unique output return
 - adjust planner prompt to use tool better
+- plan: background, knowledge, categories_str, task, tool
+- execute: background, context, tool
+- evaluator: background, context
+- replan: background, knowledge, categories_str, task, tool
+- summary include agent execute result

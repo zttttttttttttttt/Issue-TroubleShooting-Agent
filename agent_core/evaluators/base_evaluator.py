@@ -14,7 +14,7 @@ class BaseEvaluator(AgentBasic):
     """
 
     def __init__(self, model_name: Optional[str] = None, log_level: Optional[str] = None,
-                 evaluation_threshold: Optional[float] = 0.8):
+                 evaluation_threshold: Optional[float] = 0.8, max_attempt: Optional[int] = 3):
         """
         Pass in the agent's model instance so we can call model.process(...) for evaluation prompts.
         Optionally specify log_level for debug or other logs.
@@ -23,6 +23,7 @@ class BaseEvaluator(AgentBasic):
         super().__init__(self.__class__.__name__, model_name, log_level)
         self.evaluation_threshold = evaluation_threshold
         self.prompt = self.default_prompt()
+        self.max_attempt = max_attempt
 
     @abstractmethod
     def default_prompt(self):
