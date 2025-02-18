@@ -33,11 +33,13 @@ class Agent(AgentBasic):
 You are an assistant summarizing the outcome of a multi-step plan execution.
 Below is the complete step-by-step execution history. Provide a concise,
 well-structured summary describing how the solution was achieved and any
-notable details. Include each step's role in the final outcome.
+notable details. Include each step's role in the final outcome. 
+And display the last step result as output in execution history
 
 Execution History:
 {history_text}
 
+Output:
 Summary:
 """
 

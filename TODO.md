@@ -1,19 +1,9 @@
 # TODO
 
 ### Feature
-- execution bug: 
-1) if step B successful, prvious step A is removed in the execution prompt
-2) should remove Previous Step Failed Attempt record in context
-- replan bug
-1) plan_graph.tools_knowledge is missing when replanning
-- compatible with autogen and langgraph
-- validation retry in generic planner(v1)
-- summary include agent execute result(v1)
-- execute: background, context, tool (v1)
-- evaluator: background, context (v1)
-- tool execute try catch exception add evaluator, add suggestion (v1)
-- replan: background, knowledge, categories_str, task, tool (background, knowledge, categories_str, task, tool) (v1)
-
+- compatible with autogen
+- tool execute try catch exception add evaluator, add suggestion (v1) (done need test)
+- validation retry in generic planner(v1) (done need test)
 - change context by step(v2)
 - enrich log (input/output/prompt)(v2)
 - knowledge & background rag (v2)
@@ -54,3 +44,9 @@
      "max_attempts": 3
 }
 ```
+- plan: background, knowledge, categories_str, task, tool
+- execute: background, context, tool
+- evaluator: background, context
+- replan: background, knowledge, categories_str, task, tool
+- summary include agent execute result
+- compatible with langgraph

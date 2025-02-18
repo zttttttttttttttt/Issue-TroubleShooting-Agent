@@ -6,7 +6,6 @@ from langchain_core.tools import BaseTool
 from .base_planner import BasePlanner, tool_knowledge_format, background_format
 from ..entities.steps import Steps, Step
 from ..evaluators import BaseEvaluator
-from ..utils.context_manager import ContextManager
 
 
 class GenericPlanner(BasePlanner):
@@ -111,7 +110,7 @@ class GenericPlanner(BasePlanner):
         task: str,
         execution_history: Steps,
         evaluators_enabled: bool,
-        evaluators: dict,
+        evaluators: Dict[str, BaseEvaluator],
         context_manager=None,
         background: str = "",
     ):
@@ -142,9 +141,37 @@ class GenericPlanner(BasePlanner):
 
             # Optional Evaluation
             if evaluators_enabled:
-                self.process_evaluator(
-                    task, step, evaluators, response, background, context_manager
+                attempt = 1
+                chosen_cat = step.category if step.category in evaluators else "default"
+                evaluator = evaluators.get(chosen_cat)
+                evaluator_result = evaluator.evaluate(
+                    task, step.description, response, background, context_manager
                 )
+                self.logger.info(
+                    f"Evaluator Decision: {evaluator_result.decision}, Score: {evaluator_result.score}"
+                )
+                while evaluator_result.score / 40 <= evaluator.evaluation_threshold\
+                        and evaluator.max_attempt - 1 > attempt:
+                    self.logger.info(f"Executing Step {idx} Failed Attempt {attempt}: {step.description}")
+                    replan_prompt = f"""
+                        {context_section}
+                        {background_format(background)}
+                        <Task>
+                        <Root Task>
+                        {task}
+                        </Root Task>
+                        {step.description}
+                        </Task>
+                        <Evaluator/>
+                        {evaluator_result.details}
+                        <Evaluator>
+                        """
+                    response = self._model.process(replan_prompt)
+                    evaluator_result = evaluator.evaluate(
+                        task, step.description, response, background, context_manager
+                    )
+                    self.logger.info(f"Response for Rerun Step {idx} Failed Attempt {attempt}: {response}")
+                    attempt = attempt + 1
 
             # Record the step execution
             execution_history.add_step(
@@ -155,29 +182,6 @@ class GenericPlanner(BasePlanner):
                 execution_history.execution_history_to_str(),
             )
         return "Task execution completed using GenericPlanner."
-
-    def process_evaluator(
-        self,
-        root_task: str,
-        step: Step,
-        evaluators: Dict[str, BaseEvaluator],
-        response: str,
-        background: str,
-        context_manager: ContextManager,
-    ):
-        chosen_cat = step.category if step.category in evaluators else "default"
-        evaluator = evaluators.get(chosen_cat)
-        if evaluator:
-            evaluator_result = evaluator.evaluate(
-                root_task, step.description, response, background, context_manager
-            )
-            self.logger.info(
-                f"Evaluator Decision: {evaluator_result.decision}, Score: {evaluator_result.score}"
-            )
-        else:
-            self.logger.warning(
-                f"No evaluator found even for 'default' category. Skipping evaluation."
-            )
 
     def analyse_result(self, steps_data, categories):
         valid_categories = set(categories) if categories else set()
