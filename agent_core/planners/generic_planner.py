@@ -15,31 +15,33 @@ class GenericPlanner(BasePlanner):
     """
 
     EXAMPLE_JSON1 = """
+{
+    "steps": [
         {
-            "steps": [
-                {
-                    "step_name": "Prepare eggs",
-                    "step_description": "Get the eggs from the fridge and put them on the table.",
-                    "use_tool": true,
-                    "tool_name": "Event",
-                    "step_category": "action"
-                },
-                ...
-            ]
-        }"""
+            "step_name": "Prepare eggs",
+            "step_description": "Get the eggs from the fridge and put them on the table.",
+            "use_tool": true,
+            "tool_name": "Event",
+            "step_category": "action"
+        },
+        ...
+    ]
+}
+    """
 
     EXAMPLE_JSON2 = """
+{
+    "steps": [
         {
-            "steps": [
-                {
-                    "step_name": "Plan code structure",
-                    "step_description": "Outline the classes and methods.",
-                    "use_tool": false,
-                    "step_category": "coding"
-                },
-                ...
-            ]
-        }"""
+            "step_name": "Plan code structure",
+            "step_description": "Outline the classes and methods.",
+            "use_tool": false,
+            "step_category": "coding"
+        },
+        ...
+    ]
+}
+    """
 
     def __init__(self, model_name: str = None, log_level: Optional[str] = None):
         """
@@ -123,15 +125,15 @@ class GenericPlanner(BasePlanner):
                 context_manager.context_to_str() if context_manager else ""
             )
             final_prompt = f"""
-                {context_section}
-                {background_format(background)}
-                <Task>
-                <Root Task>
-                {task}
-                </Root Task>
-                {step.description}
-                </Task>
-                """
+{context_section}
+{background_format(background)}
+<Task>
+<Root Task>
+{task}
+</Root Task>
+{step.description}
+</Task>
+            """
 
             self.logger.info(f"Executing Step {idx}: {step.description}")
             response = self._model.process(final_prompt)
