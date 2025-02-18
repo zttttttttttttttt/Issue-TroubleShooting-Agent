@@ -10,34 +10,29 @@ sys.path.insert(0, parent_dir)
 
 from agent_core.agents import Agent
 from agent_core.planners import GenericPlanner
-from agent_core.validators.score_validator import ScoreValidator
-
-from agent_core.config import Config
-
-# Globally sets the log level to DEBUG for detailed logging across the framework
-Config.set_log_level("DEBUG")
+from agent_core.evaluators import GenericEvaluator
 
 
 def main():
     """
     Demonstrates how to override default prompts for:
-    1) Validator (ScoreValidator)
+    1) evaluator (Scoreevaluator)
     2) Agent single-step execution
-    3) Planner multi-step prompt
+    3) Planner multistep prompt
     4) Agent's final summary prompt
 
-    These overrides only apply to the current instances of validator, agent, and planner.
+    These overrides only apply to the current instances of evaluator, agent, and planner.
     Once a new object is created, it will revert to the default prompt.
     """
 
-    # --- 1) OVERRIDE ScoreValidator Prompt ----------------------------------
-    validator = ScoreValidator()
-    # Print current default validator prompt
-    print("Default Validator Prompt:\n", validator.prompt)
+    # --- 1) OVERRIDE Scoreevaluator Prompt ----------------------------------
+    evaluator = GenericEvaluator()
+    # Print current default evaluator prompt
+    print("Default evaluator Prompt:\n", evaluator.prompt)
 
     # Replace it with a grammar-focused prompt; note the placeholders {request} and {response} must remain
-    validator.prompt = """\
-    You are a special validator focusing on only grammar correctness.
+    evaluator.prompt = """\
+    You are a special evaluator focusing on only grammar correctness.
     Subtask: {request}
     Output: {response}
     Please check grammar only.
@@ -67,11 +62,47 @@ def main():
     # Override the planner's prompt to produce exactly two steps in JSON
     # Placeholders typically include: {task}, {tools_knowledge}, {knowledge}, {example_json1}, {example_json2}.
     planner.prompt = """\
-    I only want two simple steps:
-    Task: {task}
-    Tools: {tools_knowledge}
-    Output JSON with two main steps.
-    Present each step in JSON format with the attributes 'step_name', 'step_description', 'use_tool', and optionally 'tool_name', and 'step_category'.
+    Given the following task and the tools, generate a high-level plan by breaking it down into meaningful, actionable steps.
+
+    **Instructions for generating 'use_tool':**
+    If the <Tools></Tools> section is empty, set "use_tool" to false for all steps and omit "tool_name."
+    If the <Tools></Tools> section contains tools, set "use_tool" to true when a tool is necessary. Include "tool_name" in those steps and reference any tool-specific properties or arguments in the description.
+
+    **Task Breakdown Requirements:**
+    1) All steps must be encapsulated under the "steps" key in valid JSON format.
+    2) Each step should include:
+        "step_name": The name of the step
+        "step_description": A concise description of the action to be performed in that step
+        "use_tool": A boolean indicating whether a tool should be used
+        Optionally, "tool_name": The name of the tool if "use_tool" is true
+        "step_category": Categorize the step based on its function ({categories_str})
+    3) The possible categories for each step are: {categories_str}.
+      If you cannot fit into any existing category, define a new category in "step_category".
+    4) Output **ONLY** valid JSON. No extra text, no Markdown.   
+    5) Steps should be high-level but clear and not missing any aspect, had better used all tools to analyse, avoiding overly detailed breakdowns for simple tasks.
+    
+    {background}
+    
+    <Knowledge>
+    {knowledge}
+    </Knowledge>
+
+    <Examples>
+    {example_json1}
+    {example_json2}
+    </Examples>
+
+    <Tools>
+    {tools_knowledge}
+    </Tools>
+
+    <Task>
+    {task}
+    </Task>
+    
+    I only want two simple steps.
+    Output ONLY valid JSON. No extra text or markdown.
+    Steps:
     """
 
     # Attach this planner to the agent

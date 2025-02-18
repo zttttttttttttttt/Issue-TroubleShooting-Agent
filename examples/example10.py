@@ -8,14 +8,15 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
+
 from agent_core.agents import Agent
 from agent_core.planners import GenericPlanner
 
 
 def main():
 
-    agent = Agent(model="gpt-4o-mini")
-    agent.planner = GenericPlanner(model="gpt-3.5-turbo")
+    agent = Agent(model_name="gemini-1.5-flash-002")
+    agent.planner = GenericPlanner(model_name="gemini-1.5-pro-002")
 
     context = agent.context
     print(context)

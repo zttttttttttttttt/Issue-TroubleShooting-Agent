@@ -14,8 +14,7 @@ from agent_core.planners import GenericPlanner
 
 def main():
 
-    agent = Agent()
-    agent.model = "gpt-4o-mini"
+    agent = Agent("gemini-1.5-flash-002")
     agent.planner = GenericPlanner()
 
     task = "3 steps draw a flower."

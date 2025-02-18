@@ -489,7 +489,7 @@ Task response: {response}
                 output=result, validation_score=1.0, timestamp=datetime.now()
             )
             node.execution_results.append(execution_result)
-            return 1.0, {}
+            return 1.0
 
         chosen_cat = (
             node.task_category if node.task_category in agent.validators else "default"
@@ -503,7 +503,7 @@ Task response: {response}
                 output=result, validation_score=1.0, timestamp=datetime.now()
             )
             node.execution_results.append(execution_result)
-            return 1.0, {}
+            return 1.0
 
         decision, score, details = validator.validate(node.task_description, result)
         numeric_score = float(score) / 40.0

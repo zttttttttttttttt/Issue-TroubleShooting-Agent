@@ -1,40 +1,37 @@
 # examples/example11.py
+
 import sys
 import os
 
+# Add the parent directory to sys.path to allow imports from the framework
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
 from agent_core.agents import Agent
 from agent_core.planners.generic_planner import GenericPlanner
-
-# Suppose you created a specialized WrittingValidator or CodingValidator
-from agent_core.validators.score_validator import ScoreValidator
-
-# from validators.coding_validator import CodingValidator
-# from validators.writting_validator import WrittingValidator
+from agent_core.evaluators import GenericEvaluator
 
 
 def main():
     agent = Agent()
     agent.planner = GenericPlanner()
 
-    # 1) Enable validation
-    agent.enable_validators()
+    # 1) Enable evaluation
+    agent.enable_evaluators()
 
-    # 2) See default validator mapping
-    print("Default validators:", agent.validators)
+    # 2) See default evaluator mapping
+    print("Default evaluator:", agent.evaluators)
 
-    # 3) Add a new validator
-    writting_validator = ScoreValidator(agent.model)
-    agent.add_validator("writing", writting_validator)
+    # 3) Add a new evaluator
+    writing_evaluator = GenericEvaluator(agent.model_name)
+    agent.add_evaluator("writing", writing_evaluator)
 
     # 4) Update existing category
-    coding_validator = ScoreValidator(agent.model)
-    agent.update_validator("coding", coding_validator)
+    coding_evaluator = GenericEvaluator(agent.model_name)
+    agent.update_evaluator("coding", coding_evaluator)
 
-    print("Validators after updates:", agent.validators)
+    print("evaluators after updates:", agent.evaluators)
 
     # 5) Execute a simple task
     task = "3 steps to draw a flower"

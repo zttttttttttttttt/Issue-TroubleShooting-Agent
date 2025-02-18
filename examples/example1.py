@@ -13,7 +13,7 @@ from agent_core.agents import Agent
 
 def main():
 
-    agent = Agent(model="gpt-4o-mini")
+    agent = Agent(model_name="gemini-1.5-flash-002")
     agent.execute("Who are you?")
     print(f"Response: {agent.execution_responses}")
 

@@ -1,15 +1,14 @@
-# validators/score_validator.py
+# evaluator/generic_evaluator.py
 
 import re
 from typing import Optional
-from agent_core.utils.logger import get_logger
-from .base_validator import BaseValidator
-import os
+from .base_evaluator import BaseEvaluator
+from .entities.evaluator_result import EvaluatorResult
 
 
-class ScoreValidator(BaseValidator):
-    DEFAULT_PROMPT = """\
-You are an expert validator of AI-generated outputs. Evaluate the provided subtask output based on the following criteria:
+class GenericEvaluator(BaseEvaluator):
+    DEFAULT_PROMPT = """
+You are an expert evaluator of AI-generated outputs. Evaluate the provided subtask output based on the following criteria:
 
 1. **Accuracy** (Score 1-5): The output fulfills the requirements of the subtask accurately.
 2. **Completeness** (Score 1-5): The output addresses all aspects of the subtask.
@@ -34,63 +33,60 @@ At the end:
 - **Rerun Subtask** if the total score is 35 or below, or if any criterion scored below 3.
 
 - If recommending a rerun, provide suggestions on how to improve the output.
-
+- If output is an incorrect and unexpected structure in response, provide the structure evaluation output still (Score 0 for each criteria)
+- If output is incorrect tool arguments and unexpected result when invoke the tool, provide the change suggestion and the structure evaluation output still (Score 0 for each criteria)
 ---
 
-**Subtask Description:**
+**Background**
+{background}
+
+**Context**
+{context}
+
+**Description of ultimate task goal:**
+{root_task}
+
+**Description of current Step:**
 {request}
 
-**Subtask Output:**
+**Output of current step:**
 {response}
 
-**Evaluation:**
+**Evaluation of current step:**
 """
 
     def __init__(
         self,
-        model: Optional[str] = None,
+        model_name: Optional[str] = None,
         log_level: Optional[str] = None,
-        validation_threshold: Optional[float] = 0.9,
+        evaluation_threshold: Optional[float] = 0.9,
     ):
+        super().__init__(model_name, log_level, evaluation_threshold)
+
+    def evaluate(
+        self, root_task, request, response, background, context_manager
+    ) -> EvaluatorResult:
         """
-        Pass in the agent's model instance so we can call model.process(...) for validation prompts.
-        Optionally specify log_level for debug or other logs.
-        'prompt' can override the default prompt template.
+        Mandatory method from BaseEvaluator. Must return (decision, score, details).
         """
-        self.logger = get_logger("score-validator", log_level)
+        prompt_text = self.prompt.format(
+            root_task=root_task,
+            request=request,
+            response=response,
+            background=background,
+            context=context_manager.context_to_str(),
+        )
+        evaluation_response = self._model.process(prompt_text)
+        decision, total_score, scores = self.parse_scored_evaluation_response(
+            evaluation_response
+        )
+        details = {"score_breakdown": scores, "raw_evaluation": evaluation_response}
+        return EvaluatorResult(decision, total_score, details)
 
-        if not model:
-            model = os.getenv("DEFAULT_MODEL")
+    def default_prompt(self):
+        return self.DEFAULT_PROMPT
 
-        self.model = model
-        self.validation_threshold = validation_threshold
-        self._prompt = self.DEFAULT_PROMPT
-
-    @property
-    def prompt(self) -> str:
-        """Get or set the entire validation prompt template."""
-        return self._prompt
-
-    @prompt.setter
-    def prompt(self, value: str):
-        self._prompt = value
-
-    def parse_validation_response(self, validation_response):
-        """
-        Simple check if the model's textual response
-        contains 'Accept Output' or 'Rerun Subtask'.
-        """
-        accept_keywords = ["Accept Output", "accept output"]
-        rerun_keywords = ["Rerun Subtask", "rerun subtask"]
-
-        if any(keyword in validation_response for keyword in accept_keywords):
-            return "Accept Output"
-        elif any(keyword in validation_response for keyword in rerun_keywords):
-            return "Rerun Subtask"
-        else:
-            return "Undetermined"
-
-    def parse_scored_validation_response(self, validation_response):
+    def parse_scored_evaluation_response(self, evaluation_response):
         """
         Attempts to parse numeric scores from the text and compute a total_score.
         We also check if any single score < 3 triggers a rerun decision.
@@ -98,7 +94,7 @@ At the end:
         scores = []
         total_score = 0
 
-        lines = validation_response.strip().split("\n")
+        lines = evaluation_response.strip().split("\n")
         for line in lines:
             # Several regex attempts to capture "Score: <digit>"
             match_1 = re.match(
@@ -148,47 +144,9 @@ At the end:
         any_low_scores = any(score < 3 for _, score in scores)
 
         # Final decision logic
-        if float(total_score) / 40.0 > self.validation_threshold and not any_low_scores:
+        if float(total_score) / 40.0 > self.evaluation_threshold and not any_low_scores:
             decision = "Accept Output"
         else:
             decision = "Rerun Subtask"
 
         return decision, total_score, scores
-
-    def validate(self, request, response):
-        """
-        Mandatory method from BaseValidator. Must return (decision, score, details).
-        """
-        prompt_text = self._prompt.format(request=request, response=response)
-        validation_response = self.model.process(prompt_text)
-        # return validation_response
-        decision, total_score, scores = self.parse_scored_validation_response(
-            validation_response
-        )
-
-        details = {"score_breakdown": scores, "raw_evaluation": validation_response}
-        return decision, total_score, details
-
-
-# Example usage as standalone script:
-if __name__ == "__main__":
-    from agent_core.models import ModelRegistry
-
-    # For demonstration, get a mock model from your registry
-    # (replace "gpt-4o-mini" with whatever is registered in your system)
-    mock_model = ModelRegistry.get_model("gpt-4o-mini")
-
-    subtask_description = "Translate the following text into French: 'Hello World.'"
-    subtask_output = "Bonjour le monde."
-
-    score_validator = ScoreValidator(mock_model)  # pass the agent's model
-    validation_result = score_validator.validate(subtask_description, subtask_output)
-    print("Raw Validation Response:\n", validation_result)
-
-    # Parse out final decision and numeric scores
-    decision, total_score, scores = score_validator.parse_scored_validation_response(
-        validation_result
-    )
-    print("\nTotal Score:", total_score)
-    print("Scores by Criterion:", scores)
-    print("Final Decision:", decision)

@@ -3,7 +3,6 @@
 from .base_model import BaseModel
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
-import os
 
 
 class DeepSeekCoderModel(BaseModel):
@@ -12,8 +11,6 @@ class DeepSeekCoderModel(BaseModel):
         self.model_instance = ChatOpenAI(
             model_name="deepseek-coder", temperature=0.1, verbose=True
         )
-        os.getenv("openai_api_key")
-        pass
 
     def process(self, request: str) -> str:
         messages = [

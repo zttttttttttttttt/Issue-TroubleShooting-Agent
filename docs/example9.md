@@ -11,17 +11,17 @@ This README explains how to customize prompt strings in different parts of the f
 
 - Creates a multi-step plan (prompt).
 
-3. **Validator** (e.g., ScoreValidator):
+3. **evaluator** (e.g., GenericEvaluator):
 
 - Evaluates correctness or quality of LLM output (prompt).
 
-By overriding these prompts, developers can tailor the output style, instructions, or constraints for each step in the agent’s workflow. Customizing these prompts only affects the current instance of Agent, Planner, or Validator and does not persist globally (i.e., creating a new Agent() reverts to default prompts).
+By overriding these prompts, developers can tailor the output style, instructions, or constraints for each step in the agent’s workflow. Customizing these prompts only affects the current instance of Agent, Planner, or evaluator and does not persist globally (i.e., creating a new Agent() reverts to default prompts).
 
 # Capabilities at a Glance
 
-1. **Override ScoreValidator Prompt**
+1. **Override GenericEvaluator Prompt**
 
-- By default, ScoreValidator checks multiple criteria (accuracy, relevance, etc.).
+- By default, GenericEvaluator checks multiple criteria (accuracy, relevance, etc.).
 - You can change it to check grammar only, or other specialized concerns, by setting its .prompt.
 
 2. **Override Agent Single-Step Prompt** (execute_prompt)
@@ -91,17 +91,17 @@ Output JSON with two main steps.
 agent.planner = planner  # Attach to the agent
 ```
 
-5. **Override a Validator Prompt (e.g. ScoreValidator)**
+5. **Override a evaluator Prompt (e.g. Scoreevaluator)**
 
 ```python
-from agent_core.validators import ScoreValidator
+from agent_core.evaluator import GenericEvaluator
 
-validator = ScoreValidator()
-print("Default Validator Prompt:\n", validator.prompt)
+evaluator = GenericEvaluator()
+print("Default evaluator Prompt:\n", evaluator.prompt)
 
-# Custom grammar-only validator prompt
-validator.prompt = """\
-You are a special validator focusing on only grammar correctness.
+# Custom grammar-only evaluator prompt
+evaluator.prompt = """\
+You are a special evaluator focusing on only grammar correctness.
 Subtask: {request}
 Output: {response}
 Please check grammar only.
@@ -118,7 +118,7 @@ print("Final Summary:\n", agent.get_execution_result_summary())
 
 # Effects and Scope
 
-- Overridden Prompts are local to the current objects: agent, planner, validator.
+- Overridden Prompts are local to the current objects: agent, planner, evaluator.
 - Once you destroy or re-initialize them (agent = Agent()), the defaults are restored.
 - If you want to keep your overrides, re-apply them each time you create a new instance.
 
@@ -127,7 +127,7 @@ print("Final Summary:\n", agent.get_execution_result_summary())
 example9.py demonstrates these capabilities:
 
 1. Set Config.set_log_level("DEBUG") to see detailed logs.
-2. Create a new ScoreValidator, override prompt to check grammar only.
+2. Create a new Scoreevaluator, override prompt to check grammar only.
 3. Create a new Agent, override the single-step execute_prompt.
 4. Create a GenericPlanner, override the prompt to produce only two steps.
 5. Execute the agent with a custom environment.
@@ -137,7 +137,7 @@ example9.py demonstrates these capabilities:
 
 By following the pattern in example9.py, you can flexibly:
 
-- Define how each Validator judges outputs.
+- Define how each evaluator judges outputs.
 - Shape how each Agent either runs tasks directly or uses a Planner.
 - Customize the final summary generation.
 
