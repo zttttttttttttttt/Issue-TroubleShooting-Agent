@@ -69,7 +69,7 @@ def increase_pod(pod_num: Annotated[int, "pod amount"]) -> List:
 
 
 def main():
-    agent = Agent(model="gpt-4o-mini")
+    agent = Agent(model_name="gemini-1.5-flash-002")
     agent.tools = [get_metric, get_log, get_trace]
 
     agent.knowledge = """\

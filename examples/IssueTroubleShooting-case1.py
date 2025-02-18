@@ -52,7 +52,7 @@ def get_trace(trace_id: Annotated[str, "trace id"]) -> List:
 
 
 def main():
-    agent = Agent(model="gpt-4o-mini")
+    agent = Agent(model_name="gemini-1.5-flash-002")
     agent.tools = [get_metric, get_log, get_trace]
 
     agent.knowledge = """\
