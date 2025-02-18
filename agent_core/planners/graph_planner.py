@@ -4,7 +4,11 @@ import json
 import re
 
 from agent_core.evaluators import BaseEvaluator
-from agent_core.planners.base_planner import BasePlanner, background_format, tool_knowledge_format
+from agent_core.planners.base_planner import (
+    BasePlanner,
+    background_format,
+    tool_knowledge_format,
+)
 from agent_core.planners.generic_planner import GenericPlanner, Step
 from agent_core.models.model_registry import ModelRegistry
 from agent_core.utils.context_manager import ContextManager
@@ -354,7 +358,13 @@ You are an intelligent assistant helping to adjust a task execution plan represe
             node = pg.nodes[pg.current_node_id]
             response = self._execute_node(node, self.model_name, task, background)
             execution_result, details = self._evaluate_node(
-                node, task, response, evaluators_enabled, evaluators, background, context_manager
+                node,
+                task,
+                response,
+                evaluators_enabled,
+                evaluators,
+                background,
+                context_manager,
             )
             self.logger.info(
                 f"Node {node.id} execution score: {execution_result.evaluation_score}"
@@ -400,10 +410,23 @@ Task response: {response}
                     break
             else:
                 if _should_replan(node):
+
+                    attempt = "|".join(str(i) for i in range(node.current_attempts + 1))
+                    self.context_manager.context = {
+                        k: v
+                        for k, v in self.context_manager.context.items()
+                        if not re.match(
+                            f"Previous Step {node.id}(.([0-9])*)* Failed Attempt ({attempt})?",
+                            k,
+                        )
+                    }
+
                     self.logger.warning(f"Replanning needed at Node {node.id}")
                     failure_info = self.prepare_failure_info(node, details)
                     replan_response = self.call_llm_for_replan(pg, failure_info)
-                    adjustments = LLMChat(self.model_name).parse_llm_response(replan_response)
+                    adjustments = LLMChat(self.model_name).parse_llm_response(
+                        replan_response
+                    )
                     if adjustments:
                         pg.replan_history.add_record(
                             {
@@ -494,7 +517,9 @@ Task response: {response}
                 if data["use_tool"]:
                     if node.task_tool is not None:
                         try:
-                            tool_response = node.task_tool.invoke(data['tool_arguments'])
+                            tool_response = node.task_tool.invoke(
+                                data["tool_arguments"]
+                            )
                             response = (
                                 f"task tool description: {node.task_tool.description}\n"
                                 f"task tool response : {tool_response}"
@@ -595,7 +620,11 @@ Task response: {response}
             tools_knowledge=plan_graph.tools,
             root_task=plan_graph.task,
             context_str=context_str,
-            categories_str=", ".join(plan_graph.categories) if plan_graph.categories else "(Not defined)",
+            categories_str=(
+                ", ".join(plan_graph.categories)
+                if plan_graph.categories
+                else "(Not defined)"
+            ),
             plan_summary=plan_summary,
             execution_history=failure_info["execution_history"],
             failure_reason=failure_info["failure_reason"],
