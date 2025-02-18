@@ -7,7 +7,6 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
 from agent_core.agents import Agent
-from agent_core.planners import GenericPlanner
 from agent_core.planners import GraphPlanner
 from langchain_core.tools import tool
 from typing import Annotated, List
