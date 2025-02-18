@@ -6,7 +6,6 @@ import re
 from agent_core.evaluators import BaseEvaluator
 from agent_core.planners.base_planner import (
     BasePlanner,
-    background_format,
     tool_knowledge_format,
 )
 from agent_core.planners.generic_planner import GenericPlanner, Step
