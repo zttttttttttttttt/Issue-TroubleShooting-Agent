@@ -32,14 +32,13 @@ def get_metric(
 @tool("log")
 def get_log(
         component_name: Annotated[str, "component name"],
-        event_id: Annotated[int, "event id"],
         start_time: Annotated[int, "start time"],
         end_time: Annotated[int, "end time"],
 ) -> dict:
     """Get log from kibana by component name and event id"""
     return {
-        "trace_id": "123456-123456-123456", "component": "IE", "event_id": "10000", "log": "504 Gateway Timeout for view commodity details",
-        "trace_id": "123457-123457-123457", "component": "IE", "event_id": "10000", "log": "504 Gateway Timeout for view commodity details"
+        "trace_id": "123456-123456-123456", "component": "IE", "log": "504 Gateway Timeout for view commodity details",
+        "trace_id": "123457-123457-123457", "component": "IE", "log": "504 Gateway Timeout for view commodity details"
     }
 
 
