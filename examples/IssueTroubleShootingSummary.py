@@ -20,6 +20,11 @@ Below is the complete step-by-step execution history. Provide a concise, well-st
 --Best Resolution Analysis: analyze options by multi-criteria decision making methods by weights and recommend the optimal resolution(cost,turnaround time, side impact risk, convenience, temporary or permanent, organizational policy and standard restrictions, historical system background resolution relevance)
 --Best Resolution Recommendation: describe the optimal resolution and why it is recommended
 
+4.**Resolution Implementation
+--Action taken: list the action using the action tool we provide 
+--Tools: tools you used to do action for resolution implementation
+--Action effect: give the effect of taken action
+
 Output **ONLY** valid Markdown
 
 Execution History:

@@ -57,9 +57,9 @@ def get_trace(trace_id: Annotated[str, "trace id"]) -> List:
     ]
 
 
-@tool("pod")
+@tool("increase pod")
 def increase_pod(pod_num: Annotated[int, "pod amount"]) -> List:
-    """Increase pods number in Kubernetes"""
+    """The tool that could be used to implement resolution you recommended :Increase pods number in Kubernetes"""
     return [
         {
             "podReplicas": 2
