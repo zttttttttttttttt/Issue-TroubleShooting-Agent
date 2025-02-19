@@ -15,28 +15,28 @@ import IssueTroubleShootingSummary
 
 @tool("metric")
 def get_metric(
-        component_name: Annotated[str, "component name"],
+        metric_name: Annotated[str, "metric  name"],
         start_time: Annotated[int, "start time"],
         end_time: Annotated[int, "end time"],
 ) -> List:
     """Get metric data from prometheus by component name"""
     return [
-        {"component": "Client maintain system", "name": "CPU Usage",
-         "desc": "the cpu usage of the component, unit is %", "data": [[123456789, 10], [123456789, 12]]},
-        {"component": "Client maintain system", "name": "DB Memory Usage",
-         "desc": "the memory usage of the database, unit is %", "data": [[123456789, 100], [123456789, 100]]},
+        {"metric_name": "CPU Usage",
+         "desc": "the cpu usage of the component, unit is %", "data": [[123456789, 95], [123456789, 95]]},
+
+        {"metric_name": "Memory Usage",
+         "desc": "the memory usage of the database, unit is %", "data": [[123456789, 80], [123456789, 81]]}
     ]
 
 
 @tool("log")
 def get_log(
         component_name: Annotated[str, "component name"],
-        event_id: Annotated[int, "event id"],
         start_time: Annotated[int, "start time"],
         end_time: Annotated[int, "end time"],
 ) -> dict:
-    """Get log from kibana by component name and event id"""
-    return {"trace_id": "123456-123456-123456", "component": "IE", "event_id": "10000", "log": "sql execute failed"}
+    """Get log from kibana by component name"""
+    return {"trace_id": "123456-123456-123456", "component": "client maintain system", "event_id": "10000", "log": "sql execute time longer than 30s"}
 
 
 @tool("trace")
@@ -44,7 +44,6 @@ def get_trace(trace_id: Annotated[str, "trace id"]) -> List:
     """Get trace data from jaeger by trace id"""
     return [
         {
-            "eventId": 10000,
             "traceId": "123456-123456-123456",
             "process": "sql execute failed, select * from ClientInfo.table where client_name like '%z%'",
         }
@@ -57,14 +56,15 @@ def main():
 
     agent.knowledge = """\
     You are expert at issue trouble shooting. 
-    You understand user query with knowledge to determine issue context, then give out detailed trouble shooting plans and execute plans with tools,
+    You understand user query with knowledge to determine issue context, 
+    then give out detailed trouble shooting plans and execute plans with tools,
     finally you provide summary report including issue descript, root cause cause and solution advise
     """
 
     agent.background = """\
     The client maintain system provides functions for traders to view clients' information and their intentions of finical products.
     In client's profile page, traders can view the latest info of clients based on resultful apis.
-    Million Client info are stored in Database where client id are indexed. Pay attention to full table scan which may resulting performance issue.
+    Billion Client info are stored in Database where client id are indexed but client name is not indexed. 
     """
 
     agent.planner = GraphPlanner()
@@ -76,9 +76,11 @@ def main():
     agent.summary_prompt = IssueTroubleShootingSummary.ISSUE_TROUBLESHOOT_PROMPT
 
     execution_history = agent.execution_history
-    # print(f"Execution History: {execution_history}")
+    print(f"Execution History: {execution_history}")
+    print("\n")
     print(f"Response: {agent.execution_responses}")
     execution_result = agent.get_execution_result_summary()
+    print("\n")
     print(f"Execution Summary: {execution_result}")
 
 
